@@ -1,11 +1,50 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Sample HTML Page</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="0; url=/k">
+    <title>Prateek Gupta - Redirecting...</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #cfcfcf;
+            color: #232323;
+        }
+        .loader {
+            text-align: center;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e0e0e0;
+            border-top: 4px solid #ff6600;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <script>
+        // JavaScript redirect as backup
+        window.location.href = "/k";
+    </script>
 </head>
 <body>
-    <h1>Welcome to the Sample HTML Page</h1>
-    <p>This is a simple HTML document.</p>
+    <div class="loader">
+        <div class="spinner"></div>
+        <p>Redirecting to prat.ee/k...</p>
+        <p style="font-size: 0.85em; color: #666; margin-top: 1rem;">
+            If you're not redirected, <a href="/k" style="color: #ff6600;">click here</a>.
+        </p>
+    </div>
 </body>
 </html>
