@@ -87,6 +87,30 @@ export default function Home() {
             })}
         </section>
 
+        <section id="projects" class="reveal" style="margin-bottom:3rem">
+            <h2 class="section-title">Projects</h2>
+            <a href="/snake" data-link style="
+                display:inline-flex; align-items:center; gap:0.6rem;
+                padding:0.9rem 1.4rem;
+                background:linear-gradient(135deg,#0a0a12,#12081e);
+                border:1px solid #3a2860;
+                border-radius:6px;
+                text-decoration:none;
+                color:#c0a060;
+                font-family:'Cinzel',serif;
+                font-size:0.8rem;
+                letter-spacing:0.12em;
+                text-transform:uppercase;
+                transition:all 0.3s;
+                box-shadow:0 0 14px rgba(80,30,160,0.25);
+            "
+            onmouseover="this.style.borderColor='#8060c0';this.style.color='#ffd700';this.style.boxShadow='0 0 22px rgba(130,60,255,0.45)'"
+            onmouseout="this.style.borderColor='#3a2860';this.style.color='#c0a060';this.style.boxShadow='0 0 14px rgba(80,30,160,0.25)'">
+                🐍 Gothic Snake
+                <span style="font-size:0.65rem;opacity:0.6;letter-spacing:0.08em">— Dungeon Arcade</span>
+            </a>
+        </section>
+
         ${Footer()}
     </div>
     `;
