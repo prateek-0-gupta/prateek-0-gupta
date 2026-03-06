@@ -202,7 +202,7 @@ export default function SnakePage() {
         </style>
 
         <div id="gs-ui">
-            <img id="gs-logo" src="js/pages/projects/logo.png" alt="Nagmani" />
+            // <img id="gs-logo" src="js/pages/projects/logo.png" alt="Nagmani" />
             <div id="gs-hud-stats">
                 <div id="gs-score">
                     <span class="gs-counter">Naagmani: <span class="gs-val" id="scoreVal">0</span> / 1000</span>
@@ -219,42 +219,40 @@ export default function SnakePage() {
         <div id="gs-quote"></div>
 
         <div id="loreOverlay">
-            <h1>PATALA'S DESCENT</h1>
+            <h1>Amrita</h1>
             <h2>The Naga's Requiem</h2>
             <p class="lore-text">
-                You are <strong>Naagraj</strong> \u2014 the Serpent King of Patala, the sunken underworld.
-                An age ago, the Brass King Kalash invaded your sanctuary, shattered the sacred Nagmani,
-                and scattered the soul of your beloved wife <strong>Amrita</strong> into the void.
-                Now you slither through the ruins of your own kingdom, gathering what was lost.
+                You are <strong>Naagraj</strong> — the Serpent King of Patala. But what is an immortal without his soul? What is a king of dust and ruins?<br><br>
+                Centuries ago, the Brass King Kalash brought ruin to your sanctuary. He shattered the sacred Nagmani—the heart of your realm—and condemned the soul of your beloved, <strong>Amrita</strong>, to the howling void. <br><br>
+                Now, you are cursed to slither through the graveyard of your own memories. You are no longer a ruler. You are a scavenger, piecing together the fragments of a broken eternity.
             </p>
             <div class="lore-objectives">
-                <h3>YOUR QUEST</h3>
+                <h3>THE BURDEN OF EXISTENCE</h3>
                 <ul>
-                    <li>Collect <strong>1,000 Naagmani Shards</strong> to restore the sacred gem</li>
-                    <li class="soul">Gather <strong>100 Soul Shards</strong> to channel Amrita's spirit</li>
-                    <li>Soul Shards can <strong>revive you</strong> when death comes (10 shards per revival)</li>
-                    <li>Fulfill both tasks to <strong>revive Amrita</strong> from the eternal dark</li>
+                    <li>Devour <strong>1,000 Nagmani Shards</strong> to rebuild the shattered heart of the world.</li>
+                    <li class="soul">Harvest <strong>100 Soul Shards</strong> to tether Amrita's spirit to this realm.</li>
+                    <li><strong>Death is an illusion:</strong> Surrender 10 Soul Shards to deny the void and rise again.</li>
+                    <li>Defy the natural order: Fulfill both tasks to <strong>drag Amrita back</strong> from the eternal dark.</li>
                 </ul>
             </div>
             <p class="lore-controls">WASD or Arrow Keys to move \u00B7 Beware the fog and the Brass King's soldiers</p>
             <button data-action="beginDescent">Begin Descent</button>
         </div>
 
-        <div id="victoryOverlay">
+         <div id="victoryOverlay">
             <h1>AMRITA REBORN</h1>
             <p class="victory-text">
-                The Nagmani pulses with golden fire. A thousand shards reunited, a hundred soul fragments
-                woven back into light. The void trembles and parts \u2014 and from the silence,
-                she steps forward. Amrita. Your lotus. Your eternity.<br><br>
-                The Serpent King's requiem is over. Patala breathes again.
+                The Nagmani ignites with a cold, golden fire. A thousand jagged memories reunited. A hundred whispering fragments woven back into a single shape.<br><br>
+                The void trembles, forced to surrender its prize. From the absolute silence, she emerges. Amrita. To defy death is a terrible transgression—but for her, you would unravel the universe itself.<br><br>
+                The Serpent King's mourning is over. In the dark, Patala takes its first, shuddering breath.
             </p>
             <button data-action="playAgainVictory">Descend Once More</button>
         </div>
 
         <div id="gameOverlay">
-            <h1>Consumed By The Void</h1>
+            <h1>The Abyss Claims You</h1>
             <p class="death-quote" id="deathQuote"></p>
-            <button data-action="restartGame">Awaken Again</button>
+            <button data-action="restartGame">Awaken To Suffer</button>
         </div>
 
        <button id="gs-sound-toggle" data-action="toggleSound" title="Toggle Music">♫</button>
@@ -322,6 +320,10 @@ function initGothicSnakeRPG() {
     floorImg.onload = () => {
         floorPattern = ctx.createPattern(floorImg, 'repeat');
     };
+
+    // Puddle tile for floor variation
+    const puddleImg = new Image();
+    puddleImg.src = 'js/pages/projects/floor-tile-puddle.png';
 
     // Sprite assets
     const assets = {
@@ -577,7 +579,7 @@ function initGothicSnakeRPG() {
     }
 
     // Sanskrit rune characters for food-eat effect
-    const SANSKRIT_RUNES = ['ॐ', 'अ', 'श', 'र', 'न', 'म', 'ह', 'क', 'त', 'स', 'द', 'व'];
+    const SANSKRIT_RUNES = ['ॐ', 'अ', 'न्न', 'खा', 'द', 'पु', 'ष्टि', 'र', 'स'];
 
     function emitSanskritRunes(x, y) {
         spawnParticles(x, y, 5, {
@@ -607,7 +609,7 @@ function initGothicSnakeRPG() {
     function emitSoulShardParticles(x, y) {
         spawnParticles(x, y, 5, {
             color: '#b48ede',
-            text: ['\u2726', '\u25C8', '\u27E1', '\u25C7', '\u263D'],
+            text: ['आ', 'त्म', 'जी', 'व', 'प्रा', 'खं', 'हं', 'ॐ'],
             font: 'bold 20px serif',
             minSize: 20, maxSize: 26,
             speed: 1.5,
@@ -694,6 +696,19 @@ function initGothicSnakeRPG() {
                 y: chunk.oy + Math.random() * CW,
                 r: 50 + Math.random() * 150,
                 c: Math.random() > 0.5 ? '#110c10' : '#171115'
+            });
+        }
+
+        // Generate random puddle positions for floor variation
+        chunk.puddles = [];
+        const numPuddles = Math.floor(Math.random() * 4); // 0-3 puddles per chunk
+        for (let i = 0; i < numPuddles; i++) {
+            chunk.puddles.push({
+                x: chunk.ox + Math.random() * CW,
+                y: chunk.oy + Math.random() * CW,
+                size: 60 + Math.random() * 80,
+                alpha: 0.4 + Math.random() * 0.4,
+                rot: Math.random() * Math.PI * 2
             });
         }
 
@@ -1051,6 +1066,18 @@ function initGothicSnakeRPG() {
             for(let j = cy-2; j <= cy+2; j++) {
                 const chunk = world[getChunkKey(i, j)];
                 if (!chunk) continue;
+
+                // Draw puddle tiles (floor variation, behind everything)
+                if (puddleImg.complete && puddleImg.naturalWidth && chunk.puddles) {
+                    chunk.puddles.forEach(p => {
+                        ctx.save();
+                        ctx.globalAlpha = p.alpha;
+                        ctx.translate(p.x, p.y);
+                        ctx.rotate(p.rot);
+                        ctx.drawImage(puddleImg, -p.size / 2, -p.size / 2, p.size, p.size);
+                        ctx.restore();
+                    });
+                }
 
                 // Draw Trees (background decor, no collision)
                 chunk.trees.forEach(t => {
