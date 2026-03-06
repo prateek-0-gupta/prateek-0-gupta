@@ -107,9 +107,9 @@ export default function SnakePage() {
                 flex-direction: column; justify-content: center; align-items: center;
                 z-index: 20; font-family: 'Cinzel', serif; color: #8a1c1c;
             }
-            #gameOverlay h1 { font-size: 4rem; margin-bottom: 20px; text-shadow: 0 0 20px red; }
+            #gameOverlay h1 { font-size: clamp(2rem, 6vw, 4rem); margin-bottom: 20px; text-shadow: 0 0 20px red; }
             #gameOverlay button {
-                padding: 10px 30px; font-size: 1.5rem; background: #120d10; color: #c0a060;
+                padding: 10px 30px; font-size: clamp(1rem, 3vw, 1.5rem); background: #120d10; color: #c0a060;
                 border: 1px solid #c0a060; cursor: pointer; font-family: 'Cinzel', serif;
                 transition: 0.3s;
             }
@@ -134,67 +134,129 @@ export default function SnakePage() {
             .gs-counter.soul { color: #b48ede; }
             .gs-counter.soul .gs-val { color: #d4a5ff; }
 
+            /* ═══ LOADING SCREEN ═══ */
+            #loadingOverlay {
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                background: #060305;
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
+                z-index: 50; font-family: 'Cinzel', serif; color: #c0a060;
+            }
+            #loadingOverlay .load-logo {
+                width: clamp(80px, 25vw, 160px); height: auto;
+                filter: drop-shadow(0 0 20px rgba(138,28,28,0.6));
+                margin-bottom: 30px;
+                animation: loadPulse 2s ease-in-out infinite;
+            }
+            @keyframes loadPulse {
+                0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(138,28,28,0.6)); }
+                50% { transform: scale(1.06); filter: drop-shadow(0 0 35px rgba(138,28,28,0.9)); }
+            }
+            #loadingOverlay .load-title {
+                font-size: clamp(1.4rem, 4vw, 2.2rem); letter-spacing: 0.2em; color: #8a1c1c;
+                text-shadow: 0 0 20px rgba(138,28,28,0.5); margin-bottom: 6px;
+            }
+            #loadingOverlay .load-sub {
+                font-size: clamp(0.65rem, 2vw, 0.9rem); letter-spacing: 0.15em; color: #665533;
+                margin-bottom: 36px;
+            }
+            #loadingOverlay .load-bar-wrap {
+                width: clamp(180px, 50vw, 320px); height: 4px;
+                background: rgba(138,28,28,0.2); border-radius: 2px;
+                overflow: hidden; margin-bottom: 16px;
+            }
+            #loadingOverlay .load-bar {
+                height: 100%; width: 0%; border-radius: 2px;
+                background: linear-gradient(90deg, #8a1c1c, #d4af37);
+                transition: width 0.3s ease;
+            }
+            #loadingOverlay .load-hint {
+                font-size: clamp(0.6rem, 1.5vw, 0.75rem); color: #444;
+                letter-spacing: 0.08em; font-style: italic;
+            }
+
+            /* ═══ LORE / START MENU ═══ */
             #loreOverlay {
                 position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(6, 3, 5, 0.95);
-                display: none; flex-direction: column; justify-content: center; align-items: center;
+                background: radial-gradient(ellipse at center, rgba(12,8,10,0.92) 0%, rgba(6,3,5,0.98) 100%);
+                display: none; flex-direction: column; justify-content: flex-start; align-items: center;
                 z-index: 30; font-family: 'Cinzel', serif; color: #c0a060;
-                padding: 40px; text-align: center; overflow-y: auto;
+                padding: 0; text-align: center; overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            #loreOverlay .lore-inner {
+                display: flex; flex-direction: column; align-items: center;
+                width: 100%; max-width: 620px;
+                padding: clamp(24px, 5vh, 50px) clamp(16px, 5vw, 40px);
+            }
+            #loreOverlay .lore-logo {
+                width: clamp(70px, 20vw, 120px); height: auto;
+                filter: drop-shadow(0 0 16px rgba(138,28,28,0.7));
+                margin-bottom: clamp(10px, 2vh, 20px);
             }
             #loreOverlay h1 {
-                font-size: 3rem; letter-spacing: 0.15em; color: #8a1c1c;
-                text-shadow: 0 0 30px rgba(138,28,28,0.6); margin-bottom: 4px;
+                font-size: clamp(1.8rem, 6vw, 3rem); letter-spacing: 0.15em; color: #8a1c1c;
+                text-shadow: 0 0 30px rgba(138,28,28,0.6); margin-bottom: 2px;
             }
             #loreOverlay h2 {
-                font-size: 1.3rem; letter-spacing: 0.2em; color: #c0a060;
-                margin-bottom: 30px; font-weight: 400;
+                font-size: clamp(0.8rem, 2.5vw, 1.3rem); letter-spacing: 0.2em; color: #c0a060;
+                margin-bottom: clamp(14px, 3vh, 30px); font-weight: 400;
+            }
+            #loreOverlay .lore-divider {
+                width: clamp(80px, 30vw, 200px); height: 1px;
+                background: linear-gradient(90deg, transparent, rgba(138,28,28,0.5), transparent);
+                margin-bottom: clamp(14px, 2.5vh, 24px);
             }
             #loreOverlay .lore-text {
-                max-width: 600px; font-size: 0.95rem; line-height: 1.7;
-                color: #a08850; margin-bottom: 24px;
+                width: 100%; font-size: clamp(0.78rem, 2vw, 0.95rem); line-height: 1.7;
+                color: #a08850; margin-bottom: clamp(16px, 3vh, 24px);
                 text-shadow: 0 0 6px rgba(0,0,0,0.8);
             }
             #loreOverlay .lore-objectives {
-                max-width: 500px; text-align: left; margin-bottom: 24px;
-                border: 1px solid rgba(138,28,28,0.3); padding: 16px 24px;
-                background: rgba(10,7,9,0.6);
+                width: 100%; text-align: left; margin-bottom: clamp(14px, 2.5vh, 24px);
+                border: 1px solid rgba(138,28,28,0.3); padding: clamp(12px, 2vw, 16px) clamp(14px, 3vw, 24px);
+                background: rgba(10,7,9,0.6); border-radius: 2px;
             }
             #loreOverlay .lore-objectives h3 {
-                font-size: 0.9rem; color: #8a1c1c; margin-bottom: 10px; letter-spacing: 0.1em;
+                font-size: clamp(0.7rem, 1.8vw, 0.9rem); color: #8a1c1c; margin-bottom: 10px; letter-spacing: 0.1em;
             }
             #loreOverlay .lore-objectives li {
-                list-style: none; padding: 4px 0; font-size: 0.85rem; color: #a08850;
+                list-style: none; padding: 4px 0; font-size: clamp(0.72rem, 1.8vw, 0.85rem); color: #a08850;
             }
             #loreOverlay .lore-objectives li::before { content: '◈ '; color: #d4af37; }
             #loreOverlay .lore-objectives li.soul::before { content: '◈ '; color: #b48ede; }
             #loreOverlay .lore-controls {
-                font-size: 0.8rem; color: #665533; margin-bottom: 30px; letter-spacing: 0.05em;
+                font-size: clamp(0.6rem, 1.6vw, 0.8rem); color: #665533;
+                margin-bottom: clamp(16px, 3vh, 30px); letter-spacing: 0.05em;
             }
             #loreOverlay button {
-                padding: 12px 40px; font-size: 1.3rem; background: #120d10; color: #c0a060;
+                padding: clamp(8px, 2vw, 12px) clamp(24px, 6vw, 40px);
+                font-size: clamp(0.95rem, 2.8vw, 1.3rem);
+                background: #120d10; color: #c0a060;
                 border: 1px solid #8a1c1c; cursor: pointer; font-family: 'Cinzel', serif;
                 transition: 0.3s; letter-spacing: 0.1em;
             }
             #loreOverlay button:hover { background: #8a1c1c; color: #f0d890; }
 
+            /* ═══ VICTORY ═══ */
             #victoryOverlay {
                 position: absolute; top: 0; left: 0; width: 100%; height: 100%;
                 background: rgba(6, 3, 5, 0.92);
                 display: none; flex-direction: column; justify-content: center; align-items: center;
                 z-index: 25; font-family: 'Cinzel', serif; color: #d4af37;
-                padding: 40px; text-align: center;
+                padding: clamp(20px, 4vw, 40px); text-align: center;
             }
             #victoryOverlay h1 {
-                font-size: 3.5rem; color: #d4af37;
+                font-size: clamp(2rem, 6vw, 3.5rem); color: #d4af37;
                 text-shadow: 0 0 40px rgba(212,175,55,0.6), 0 0 80px rgba(212,175,55,0.3);
                 margin-bottom: 20px;
             }
             #victoryOverlay .victory-text {
-                max-width: 550px; font-size: 1.1rem; line-height: 1.8;
+                max-width: 550px; font-size: clamp(0.85rem, 2.2vw, 1.1rem); line-height: 1.8;
                 color: #c0a060; margin-bottom: 30px;
             }
             #victoryOverlay button {
-                padding: 12px 40px; font-size: 1.3rem; background: #120d10; color: #d4af37;
+                padding: clamp(8px, 2vw, 12px) clamp(24px, 6vw, 40px);
+                font-size: clamp(0.95rem, 2.8vw, 1.3rem); background: #120d10; color: #d4af37;
                 border: 1px solid #d4af37; cursor: pointer; font-family: 'Cinzel', serif;
                 transition: 0.3s;
             }
@@ -218,25 +280,37 @@ export default function SnakePage() {
 
         <div id="gs-quote"></div>
 
+        <div id="loadingOverlay">
+            <img class="load-logo" src="js/pages/projects/logo.png" alt="" />
+            <div class="load-title">AMRITA</div>
+            <div class="load-sub">The Naga's Requiem</div>
+            <div class="load-bar-wrap"><div class="load-bar" id="loadBar"></div></div>
+            <div class="load-hint">Awakening the forgotten ruins…</div>
+        </div>
+
         <div id="loreOverlay">
-            <h1>Amrita</h1>
-            <h2>The Naga's Requiem</h2>
-            <p class="lore-text">
-                You are <strong>Naagraj</strong> — the Serpent King of Patala. But what is an immortal without his soul? What is a king of dust and ruins?<br><br>
-                Centuries ago, the Brass King Kalash brought ruin to your sanctuary. He shattered the sacred Nagmani—the heart of your realm—and condemned the soul of your beloved, <strong>Amrita</strong>, to the howling void. <br><br>
-                Now, you are cursed to slither through the graveyard of your own memories. You are no longer a ruler. You are a scavenger, piecing together the fragments of a broken eternity.
-            </p>
-            <div class="lore-objectives">
-                <h3>THE BURDEN OF EXISTENCE</h3>
-                <ul>
-                    <li>Devour <strong>1,000 Nagmani Shards</strong> to rebuild the shattered heart of the world.</li>
-                    <li class="soul">Harvest <strong>100 Soul Shards</strong> to tether Amrita's spirit to this realm.</li>
-                    <li><strong>Death is an illusion:</strong> Surrender 10 Soul Shards to deny the void and rise again.</li>
-                    <li>Defy the natural order: Fulfill both tasks to <strong>drag Amrita back</strong> from the eternal dark.</li>
-                </ul>
+            <div class="lore-inner">
+                <img class="lore-logo" src="js/pages/projects/logo.png" alt="" />
+                <h1>Amrita</h1>
+                <h2>The Naga's Requiem</h2>
+                <div class="lore-divider"></div>
+                <p class="lore-text">
+                    You are <strong>Naagraj</strong> — the Serpent King of Patala. But what is an immortal without his soul? What is a king of dust and ruins?<br><br>
+                    Centuries ago, the Brass King Kalash brought ruin to your sanctuary. He shattered the sacred Nagmani—the heart of your realm—and condemned the soul of your beloved, <strong>Amrita</strong>, to the howling void.<br><br>
+                    Now, you are cursed to slither through the graveyard of your own memories. You are no longer a ruler. You are a scavenger, piecing together the fragments of a broken eternity.
+                </p>
+                <div class="lore-objectives">
+                    <h3>THE BURDEN OF EXISTENCE</h3>
+                    <ul>
+                        <li>Devour <strong>1,000 Nagmani Shards</strong> to rebuild the shattered heart of the world.</li>
+                        <li class="soul">Harvest <strong>100 Soul Shards</strong> to tether Amrita's spirit to this realm.</li>
+                        <li><strong>Death is an illusion:</strong> Surrender 10 Soul Shards to deny the void and rise again.</li>
+                        <li>Defy the natural order: Fulfill both tasks to <strong>drag Amrita back</strong> from the eternal dark.</li>
+                    </ul>
+                </div>
+                <p class="lore-controls">WASD / Arrow Keys \u00B7 Touch & drag on mobile \u00B7 Beware the fog</p>
+                <button data-action="beginDescent">Begin Descent</button>
             </div>
-            <p class="lore-controls">WASD or Arrow Keys to move \u00B7 Beware the fog and the Brass King's soldiers</p>
-            <button data-action="beginDescent">Begin Descent</button>
         </div>
 
          <div id="victoryOverlay">
@@ -273,8 +347,12 @@ function initGothicSnakeRPG() {
     const victoryOvl = document.getElementById('victoryOverlay');
     if (victoryOvl) victoryOvl.style.display = 'none';
     const loreOvl = document.getElementById('loreOverlay');
-    if (loreOvl && !_loreShown) loreOvl.style.display = 'flex';
-    else if (loreOvl) loreOvl.style.display = 'none';
+    // Hide lore initially — loading screen takes priority
+    if (loreOvl) loreOvl.style.display = 'none';
+    const loadingOvl = document.getElementById('loadingOverlay');
+    const loadBar = document.getElementById('loadBar');
+    if (loadingOvl && !_loreShown) loadingOvl.style.display = 'flex';
+    else if (loadingOvl) loadingOvl.style.display = 'none';
     const livesUI = document.getElementById('gs-lives');
     if (livesUI) {
         livesUI.innerHTML = '<span class="gs-heart"></span><span class="gs-heart"></span><span class="gs-heart"></span>';
@@ -340,6 +418,8 @@ function initGothicSnakeRPG() {
         snakeHead: new Image(),
         snakeBody: new Image(),
         snakeTail: new Image(),
+        fallenStatue:  new Image(),
+        fallenStatue1: new Image(),
     };
     const ASSET_BASE = 'js/pages/projects/';
     assets.pillar.src    = ASSET_BASE + 'pillar.png';
@@ -355,8 +435,46 @@ function initGothicSnakeRPG() {
     assets.snakeHead.src = ASSET_BASE + 'snake_head.png';
     assets.snakeBody.src = ASSET_BASE + 'snake_body.png';
     assets.snakeTail.src = ASSET_BASE + 'snake_tail.png';
+    assets.fallenStatue.src  = ASSET_BASE + 'fallen_statue.png';
+    assets.fallenStatue1.src = ASSET_BASE + 'fallen_statue_1.png';
     assets.soulShard = new Image();
     assets.soulShard.src = ASSET_BASE + 'soul_shard.png';
+
+    // ═══ LOADING SCREEN: track all image assets ═══
+    const allImages = [floorImg, puddleImg, ...Object.values(assets)];
+    let loadedCount = 0;
+    const totalImages = allImages.length;
+
+    function onAssetLoaded() {
+        loadedCount++;
+        const pct = Math.round((loadedCount / totalImages) * 100);
+        if (loadBar) loadBar.style.width = pct + '%';
+        if (loadedCount >= totalImages) onAllAssetsReady();
+    }
+
+    function onAllAssetsReady() {
+        // Dismiss loading screen
+        if (loadingOvl) {
+            loadingOvl.style.transition = 'opacity 0.6s ease';
+            loadingOvl.style.opacity = '0';
+            setTimeout(() => {
+                loadingOvl.style.display = 'none';
+                // Now show lore overlay if first time
+                if (loreOvl && !_loreShown) loreOvl.style.display = 'flex';
+            }, 600);
+        } else {
+            if (loreOvl && !_loreShown) loreOvl.style.display = 'flex';
+        }
+    }
+
+    allImages.forEach(img => {
+        if (img.complete && img.naturalWidth) {
+            onAssetLoaded();
+        } else {
+            img.addEventListener('load', onAssetLoaded, { once: true });
+            img.addEventListener('error', onAssetLoaded, { once: true });
+        }
+    });
 
     // Once fog texture loads, composite it into the pre-baked vignette
     assets.fog.onload = () => {
@@ -663,7 +781,7 @@ function initGothicSnakeRPG() {
         const chunk = {
             ox: cx * CW, oy: cy * CW,
             floor:[], obs: [], food: [], enemies:[], soulShards: [],
-            shrines: [], bells: [], walls: [], trees: []
+            shrines: [], bells: [], walls: [], trees: [], statues: []
         };
 
         // ── Placement system: collect all placed objects with radii ──
@@ -799,6 +917,23 @@ function initGothicSnakeRPG() {
             }
         }
 
+        // 4b. Place Fallen Statues (rare decorative — ~12% chance per chunk, no collision)
+        if (Math.random() < 0.12) {
+            const variant = Math.random() > 0.5 ? 1 : 0;
+            const statueR = 160;
+            const pos = tryPlace(statueR, 40, 15);
+            if (pos) {
+                chunk.statues.push({
+                    x: pos.x, y: pos.y,
+                    size: 400 + Math.random() * 200,
+                    variant,
+                    rot: (Math.random() - 0.5) * 0.2,
+                    alpha: 0.55 + Math.random() * 0.3
+                });
+                placed.push({ x: pos.x, y: pos.y, r: statueR });
+            }
+        }
+
         // 5. Place Food – keep away from obstacles but can be near trees
         const numFood = Math.floor(Math.random() * 3) + 1;
         for (let i = 0; i < numFood; i++) {
@@ -860,6 +995,57 @@ function initGothicSnakeRPG() {
     }
     window.addEventListener('keydown', e => { onFirstKey(e); handleKey(e, true); });
     window.addEventListener('keyup', e => handleKey(e, false));
+
+    // ═══════════════════════════════════════════════════════════════════
+    // TOUCH CONTROLS (mobile / tablet)
+    // ═══════════════════════════════════════════════════════════════════
+    let touchActive = false;
+    let touchStartX = 0, touchStartY = 0;
+    let touchCurrentX = 0, touchCurrentY = 0;
+    let touchAngle = 0;
+    const TOUCH_DEADZONE = 15;
+
+    function onTouchStart(e) {
+        // Don't intercept touches on UI overlays
+        if (e.target !== canvas) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        touchStartX = t.clientX;
+        touchStartY = t.clientY;
+        touchCurrentX = t.clientX;
+        touchCurrentY = t.clientY;
+        touchActive = true;
+        // Start music on first touch (browser autoplay policy)
+        if (!musicStarted && _loreShown) {
+            musicStarted = true;
+            if (!soundtrack.isPlaying()) soundtrack.start();
+            soundtrack.sfxGameStart();
+        }
+    }
+
+    function onTouchMove(e) {
+        e.preventDefault();
+        if (!touchActive) return;
+        const t = e.touches[0];
+        touchCurrentX = t.clientX;
+        touchCurrentY = t.clientY;
+        const dx = t.clientX - touchStartX;
+        const dy = t.clientY - touchStartY;
+        if (Math.hypot(dx, dy) > TOUCH_DEADZONE) {
+            touchAngle = Math.atan2(dy, dx);
+            sn.targetAngle = touchAngle;
+        }
+    }
+
+    function onTouchEnd(e) {
+        e.preventDefault();
+        touchActive = false;
+    }
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive: false });
 
     function die() {
         emitDeathParticles(sn.x, sn.y);
@@ -1091,6 +1277,21 @@ function initGothicSnakeRPG() {
                     }
                 });
 
+                // Draw Fallen Statues (decorative, no collision)
+                if (chunk.statues) {
+                    chunk.statues.forEach(st => {
+                        const img = st.variant === 1 ? assets.fallenStatue1 : assets.fallenStatue;
+                        if (img.complete && img.naturalWidth) {
+                            ctx.save();
+                            ctx.globalAlpha = st.alpha;
+                            ctx.translate(st.x, st.y);
+                            ctx.rotate(st.rot);
+                            ctx.drawImage(img, -st.size / 2, -st.size / 2, st.size, st.size);
+                            ctx.restore();
+                        }
+                    });
+                }
+
                 // Draw Shrines (large, behind other objects)
                 chunk.shrines.forEach(s => {
                     const size = s.r * 5; // big visual footprint
@@ -1272,14 +1473,51 @@ function initGothicSnakeRPG() {
         // 4. Fog-of-War: stamp pre-baked vignette
         ctx.restore(); // back to screen space
         ctx.drawImage(fogCanvas, 0, 0);
+
+        // 5. Touch joystick indicator
+        if (touchActive) {
+            const jDist = Math.min(
+                Math.hypot(touchCurrentX - touchStartX, touchCurrentY - touchStartY), 45
+            );
+            const jx = touchStartX + Math.cos(touchAngle) * jDist;
+            const jy = touchStartY + Math.sin(touchAngle) * jDist;
+            // Outer ring
+            ctx.strokeStyle = 'rgba(192, 160, 96, 0.25)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(touchStartX, touchStartY, 50, 0, Math.PI * 2);
+            ctx.stroke();
+            // Direction line
+            ctx.strokeStyle = 'rgba(192, 160, 96, 0.15)';
+            ctx.beginPath();
+            ctx.moveTo(touchStartX, touchStartY);
+            ctx.lineTo(jx, jy);
+            ctx.stroke();
+            // Inner knob
+            ctx.fillStyle = 'rgba(192, 160, 96, 0.35)';
+            ctx.beginPath();
+            ctx.arc(jx, jy, 18, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // LOOP TICK
+    // LOOP TICK (fixed-timestep: game logic always runs at 60 fps)
     // ═══════════════════════════════════════════════════════════════════
-    function tick() {
+    let lastTime = 0;
+    const FIXED_DT = 1000 / 60;   // ~16.67 ms per logic step
+    let accumulator = 0;
+
+    function tick(timestamp) {
         raf = requestAnimationFrame(tick);
-        update();
+        if (!lastTime) { lastTime = timestamp; return; }
+        const frameTime = Math.min(timestamp - lastTime, 100); // cap to avoid spiral
+        lastTime = timestamp;
+        accumulator += frameTime;
+        while (accumulator >= FIXED_DT) {
+            update();
+            accumulator -= FIXED_DT;
+        }
         render();
     }
     raf = requestAnimationFrame(tick);
@@ -1289,6 +1527,10 @@ function initGothicSnakeRPG() {
         window.removeEventListener('resize', resize);
         window.removeEventListener('keydown', handleKey);
         window.removeEventListener('keyup', handleKey);
+        canvas.removeEventListener('touchstart', onTouchStart);
+        canvas.removeEventListener('touchmove', onTouchMove);
+        canvas.removeEventListener('touchend', onTouchEnd);
+        canvas.removeEventListener('touchcancel', onTouchEnd);
         if (raf) cancelAnimationFrame(raf);
         if (quoteTimer) clearTimeout(quoteTimer);
         if (ambientInterval) clearInterval(ambientInterval);
