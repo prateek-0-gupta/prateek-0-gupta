@@ -1,11 +1,20 @@
 import { useEffect, registerHandler } from '../../framework.js';
+import createSoundtrack from './soundtrack.js';
 
 let _cleanup = null;
+const soundtrack = createSoundtrack();
 
 export default function SnakePage() {
     registerHandler('restartGame', () => {
         if (_cleanup) { _cleanup(); _cleanup = null; }
         _cleanup = initGothicSnakeRPG();
+    });
+
+    registerHandler('toggleSound', () => {
+        const playing = soundtrack.toggle();
+        const btn = document.getElementById('gs-sound-toggle');
+        if (btn) btn.textContent = playing ? '♫' : '♪';
+        if (btn) btn.style.opacity = playing ? '1' : '0.5';
     });
 
     useEffect(() => {
@@ -22,14 +31,41 @@ export default function SnakePage() {
             body, html { width: 100%; height: 100%; overflow: hidden; background-color: #0a0709; }
             
             #gs-ui {
-                position: absolute; top: 20px; left: 20px;
+                position: absolute; top: 0; left: 0; width: 100%;
                 font-family: 'Cinzel', serif; color: #c0a060;
                 z-index: 10; pointer-events: none;
-                text-shadow: 0 0 10px rgba(0,0,0,0.8);
+                display: flex; align-items: center;
+                padding: 12px 24px;
+                background: linear-gradient(180deg, rgba(8,5,7,0.85) 0%, rgba(8,5,7,0.5) 70%, transparent 100%);
             }
-            #gs-logo { width: 120px; height: auto; filter: drop-shadow(0 0 14px rgba(138,28,28,0.7)) drop-shadow(0 0 30px rgba(192,160,96,0.25)); margin-bottom: 10px; }
-            #gs-score { font-size: 1.2rem; background: rgba(0,0,0,0.5); padding: 5px 15px; border: 1px solid #3a2860; border-radius: 4px; display: inline-block;}
-            #gs-lives { font-size: 1.6rem; color: #8a1c1c; text-shadow: 0 0 8px rgba(138,28,28,0.6); margin-top: 6px; letter-spacing: 0.15em; }
+            #gs-logo {
+                width: 56px; height: auto;
+                filter: drop-shadow(0 0 8px rgba(138,28,28,0.8));
+                margin-right: 16px;
+            }
+            #gs-hud-stats {
+                display: flex; flex-direction: column; gap: 4px; flex: 1;
+            }
+            #gs-score {
+                font-size: 1rem; letter-spacing: 0.12em;
+                color: #d4af37;
+                text-shadow: 0 0 6px rgba(212,175,55,0.5);
+            }
+            #gs-score span { color: #ffdf73; font-weight: 700; }
+            #gs-lives {
+                display: flex; gap: 4px;
+            }
+            .gs-heart {
+                width: 18px; height: 18px;
+                display: inline-block;
+                background: radial-gradient(circle at 50% 40%, #c0282e, #6b0f0f);
+                clip-path: path('M9 16.5C9 16.5 1.5 11 1.5 6.3C1.5 3.5 3.7 1.5 6 1.5C7.5 1.5 8.6 2.3 9 3C9.4 2.3 10.5 1.5 12 1.5C14.3 1.5 16.5 3.5 16.5 6.3C16.5 11 9 16.5 9 16.5Z');
+                filter: drop-shadow(0 0 4px rgba(180,30,30,0.7));
+            }
+            .gs-heart.empty {
+                background: radial-gradient(circle at 50% 40%, #2a1a1a, #110a0a);
+                filter: none; opacity: 0.4;
+            }
 
             #gs-quote {
                 position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
@@ -68,12 +104,30 @@ export default function SnakePage() {
             #gameOverlay button:hover { background: #c0a060; color: #120d10; }
 
             canvas { display: block; }
+
+            #gs-sound-toggle {
+                position: absolute; top: 20px; right: 24px;
+                z-index: 15; pointer-events: all; cursor: pointer;
+                width: 36px; height: 36px;
+                background: rgba(0,0,0,0.5); border: 1px solid #3a2860;
+                border-radius: 4px; color: #c0a060;
+                font-size: 1.2rem; display: flex; align-items: center; justify-content: center;
+                font-family: 'Cinzel', serif;
+                transition: background 0.3s, border-color 0.3s;
+            }
+            #gs-sound-toggle:hover { background: rgba(60,40,96,0.4); border-color: #c0a060; }
         </style>
 
         <div id="gs-ui">
             <img id="gs-logo" src="js/pages/projects/logo.png" alt="Nagmani" />
-            <div id="gs-score">Mani: <span id="scoreVal">0</span></div>
-            <div id="gs-lives">♥♥♥</div>
+            <div id="gs-hud-stats">
+                <div id="gs-score">Mani: <span id="scoreVal">0</span></div>
+                <div id="gs-lives">
+                    <span class="gs-heart"></span>
+                    <span class="gs-heart"></span>
+                    <span class="gs-heart"></span>
+                </div>
+            </div>
         </div>
 
         <div id="gs-quote"></div>
@@ -84,6 +138,7 @@ export default function SnakePage() {
             <button data-action="restartGame">Awaken Again</button>
         </div>
 
+       <button id="gs-sound-toggle" data-action="toggleSound" title="Toggle Music">♫</button>
        <canvas id="gameCanvas"></canvas>
     </div>
     `;
@@ -97,7 +152,9 @@ function initGothicSnakeRPG() {
     overlay.style.display = 'none';
     scoreUI.innerText = '0';
     const livesUI = document.getElementById('gs-lives');
-    if (livesUI) livesUI.innerHTML = '♥♥♥';
+    if (livesUI) {
+        livesUI.innerHTML = '<span class="gs-heart"></span><span class="gs-heart"></span><span class="gs-heart"></span>';
+    }
 
     let W, H;
     function resize() {
@@ -609,20 +666,33 @@ function initGothicSnakeRPG() {
         if (k === 'a' || k === 'arrowleft') keys.a = state;
         if (k === 'd' || k === 'arrowright') keys.d = state;
     }
-    window.addEventListener('keydown', e => handleKey(e, true));
+    // Start music on first keypress (browser autoplay policy)
+    let musicStarted = false;
+    function onFirstKey(e) {
+        if (!musicStarted && (e.key === 'w' || e.key === 'a' || e.key === 's' || e.key === 'd'
+            || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+            musicStarted = true;
+            if (!soundtrack.isPlaying()) soundtrack.start();
+            soundtrack.sfxGameStart();
+        }
+    }
+    window.addEventListener('keydown', e => { onFirstKey(e); handleKey(e, true); });
     window.addEventListener('keyup', e => handleKey(e, false));
 
     function die() {
         emitDeathParticles(sn.x, sn.y);
+        soundtrack.sfxDie();
         lives--;
         updateLivesUI();
         if (lives <= 0) {
             isDead = true;
+            soundtrack.sfxGameOver();
             if (deathQuoteEl) deathQuoteEl.textContent = '\u201C' + pickQuote('death') + '\u201D';
             overlay.style.display = 'flex';
             if (quoteEl) quoteEl.className = 'fading';
         } else {
             showQuote('death', 3000);
+            soundtrack.sfxRespawn();
             // Respawn: reset snake position & trail, keep score
             sn.x = 0; sn.y = 0;
             sn.angle = 0; sn.targetAngle = 0;
@@ -634,7 +704,11 @@ function initGothicSnakeRPG() {
     function updateLivesUI() {
         const livesEl = document.getElementById('gs-lives');
         if (livesEl) {
-            livesEl.innerHTML = '♥'.repeat(Math.max(0, lives));
+            let html = '';
+            for (let i = 0; i < 3; i++) {
+                html += `<span class="gs-heart${i < lives ? '' : ' empty'}"></span>`;
+            }
+            livesEl.innerHTML = html;
         }
     }
 
@@ -695,6 +769,7 @@ function initGothicSnakeRPG() {
                     let dist = Math.hypot(sn.x - food.x, sn.y - food.y);
                     if (dist < SS + food.r) {
                         emitSanskritRunes(food.x, food.y);
+                        soundtrack.sfxEat();
                         chunk.food.splice(f, 1); // Remove eaten food
                         sn.len += 3;             // Grow
                         score++;
@@ -871,10 +946,22 @@ function initGothicSnakeRPG() {
 
             ctx.save();
             ctx.translate(p.x, p.y);
-            ctx.rotate(p.a);
 
             const isHead = (s === 0);
             const isTail = (s === sn.len - 1);
+
+            if (isTail) {
+                // Tail faces away from second-to-last segment
+                const prevIdx = Math.min((s - 1) * SG, trail.length - 1);
+                const prev = trail[prevIdx];
+                if (prev) {
+                    ctx.rotate(Math.atan2(p.y - prev.y, p.x - prev.x));
+                } else {
+                    ctx.rotate(p.a + Math.PI);
+                }
+            } else {
+                ctx.rotate(p.a);
+            }
 
             // Pick sprite: head / tail / body
             let img = assets.snakeBody;
@@ -952,5 +1039,6 @@ function initGothicSnakeRPG() {
         if (raf) cancelAnimationFrame(raf);
         if (quoteTimer) clearTimeout(quoteTimer);
         if (ambientInterval) clearInterval(ambientInterval);
+        soundtrack.stop();
     };
 }
