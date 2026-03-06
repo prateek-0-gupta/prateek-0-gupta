@@ -1,4 +1,4 @@
-import { useState, useEffect } from '../framework.js';
+import { useState, useEffect, registerHandler } from '../framework.js';
 import { Hero } from '../components/Hero.js';
 import { Experience, ExperienceItem } from '../components/Experience.js';
 import { Skills } from '../components/Skills.js';
@@ -19,7 +19,7 @@ export default function Home() {
         console.log("Skills toggled:", showAllSkills);
     }, [showAllSkills]);
 
-    window.toggleSkills = () => setShowAllSkills(!showAllSkills);
+    registerHandler('toggleSkills', () => setShowAllSkills(!showAllSkills));
 
     const heroProps = {
         // title: 'Prateek <span>Gupta</span><a href="/test" data-link style="font-size:0.5em; opacity:0.5; text-decoration:none;">(test)</a>' ,
@@ -61,7 +61,7 @@ export default function Home() {
 
             <div style="margin-top: 2rem; text-align: center;">
                 <button 
-                    onclick="window.toggleSkills()"
+                    data-action="toggleSkills"
                     style="
                         padding: 0.8rem 1.5rem; 
                         background: transparent; 

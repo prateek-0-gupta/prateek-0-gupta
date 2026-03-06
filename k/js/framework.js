@@ -1,7 +1,8 @@
 let hooks = [];
 let hookIndex = 0;
 let currentComponent = null; 
-let renderRequest = null; 
+let renderRequest = null;
+let eventHandlers = {};
 
 export function useState(initialValue) {
     const _idx = hookIndex; 
@@ -40,10 +41,87 @@ export function useEffect(callback, dependencies) {
     hookIndex++;
 }
 
+/**
+ * Register an event handler by name. Use with data-action="name" in templates.
+ * Replaces window.* global function assignments.
+ */
+export function registerHandler(name, fn) {
+    eventHandlers[name] = fn;
+}
+
+// ── DOM Morphing ─────────────────────────────────────────────────────
+// Lightweight morph that patches the existing DOM in-place instead of
+// replacing innerHTML, preserving focus, scroll position, and CSS state.
+
+function morphChildren(oldParent, newParent) {
+    const newNodes = Array.from(newParent.childNodes);
+
+    for (let i = 0; i < newNodes.length; i++) {
+        const oldNode = oldParent.childNodes[i];
+        const newNode = newNodes[i];
+
+        if (!oldNode) {
+            oldParent.appendChild(newNode.cloneNode(true));
+        } else {
+            morphNode(oldParent, oldNode, newNode);
+        }
+    }
+
+    // Remove excess old nodes from the end
+    while (oldParent.childNodes.length > newNodes.length) {
+        oldParent.removeChild(oldParent.lastChild);
+    }
+}
+
+function morphNode(parent, oldNode, newNode) {
+    // Different node types → replace
+    if (oldNode.nodeType !== newNode.nodeType) {
+        parent.replaceChild(newNode.cloneNode(true), oldNode);
+        return;
+    }
+
+    // Text / comment nodes
+    if (oldNode.nodeType === Node.TEXT_NODE || oldNode.nodeType === Node.COMMENT_NODE) {
+        if (oldNode.textContent !== newNode.textContent) {
+            oldNode.textContent = newNode.textContent;
+        }
+        return;
+    }
+
+    // Element nodes
+    if (oldNode.nodeType === Node.ELEMENT_NODE) {
+        // Different tag → full replace
+        if (oldNode.tagName !== newNode.tagName) {
+            parent.replaceChild(newNode.cloneNode(true), oldNode);
+            return;
+        }
+
+        morphAttributes(oldNode, newNode);
+        morphChildren(oldNode, newNode);
+    }
+}
+
+function morphAttributes(oldEl, newEl) {
+    // Remove attributes no longer present
+    for (const attr of Array.from(oldEl.attributes)) {
+        if (!newEl.hasAttribute(attr.name)) {
+            oldEl.removeAttribute(attr.name);
+        }
+    }
+    // Set new / changed attributes
+    for (const attr of Array.from(newEl.attributes)) {
+        if (oldEl.getAttribute(attr.name) !== attr.value) {
+            oldEl.setAttribute(attr.name, attr.value);
+        }
+    }
+}
+
+// ── Framework ────────────────────────────────────────────────────────
+
 export default class Framework {
     constructor(routes, basePath = '') {
         this.routes = routes;
-        this.basePath = basePath; //'/k'
+        this.basePath = basePath; // e.g. '/k'
         this.root = document.getElementById('app');
         this.currentPath = null;
         
@@ -56,11 +134,21 @@ export default class Framework {
         window.addEventListener('popstate', () => this.handleRoute());
         
         document.body.addEventListener('click', e => {
+            // data-link navigation
             const link = e.target.closest('[data-link]');
             if (link) {
                 e.preventDefault();
-                const href = link.getAttribute('href');
-                this.navigateTo(href);
+                this.navigateTo(link.getAttribute('href'));
+                return;
+            }
+
+            // data-action event delegation (replaces onclick="window.*")
+            const actionEl = e.target.closest('[data-action]');
+            if (actionEl) {
+                const name = actionEl.getAttribute('data-action');
+                if (eventHandlers[name]) {
+                    eventHandlers[name](e);
+                }
             }
         });
 
@@ -77,30 +165,38 @@ export default class Framework {
         this.handleRoute();
     }
 
+    /** Normalize a path: collapse trailing slashes, ensure leading slash. */
+    normalizePath(p) {
+        if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+        return p || '/';
+    }
+
     async handleRoute() {
-        let path = window.location.pathname;
+        const path = window.location.pathname;
         let mappedPath = path;
+
         if (this.basePath && path.startsWith(this.basePath)) {
             mappedPath = path.slice(this.basePath.length);
-             if (mappedPath === '') mappedPath = '/';
         }
-        let match = this.routes[mappedPath]; 
+        mappedPath = this.normalizePath(mappedPath);
+
+        let match = this.routes[mappedPath];
+
+        // Fallback: try alternate slash form
         if (!match) {
-             if (mappedPath.endsWith('/')) match = this.routes[mappedPath.slice(0, -1)];
-             else match = this.routes[mappedPath + '/'];
+            const alt = mappedPath === '/' ? '' : mappedPath + '/';
+            match = this.routes[alt];
         }
 
-        if (!match && mappedPath === '/') {
-             match = this.routes['/'];
-        }
-
         if (!match) {
-            this.root.innerHTML = '<h1>404 - Not Found</h1><p>The requested path ' + mappedPath + ' does not exist.</p>';
+            this.root.innerHTML =
+                '<h1>404 - Not Found</h1><p>The requested path ' + mappedPath + ' does not exist.</p>';
             return;
         }
 
         if (this.currentPath !== mappedPath) {
-            hooks = []; 
+            hooks = [];
+            eventHandlers = {};
             this.currentPath = mappedPath;
         }
 
@@ -110,8 +206,31 @@ export default class Framework {
 
     async update() {
         hookIndex = 0;
+        eventHandlers = {}; // handlers are re-registered on each render cycle
+
         const viewHtml = await currentComponent();
-        this.root.innerHTML = viewHtml;
+
+        // Save scroll & focus before patching
+        const activeId = document.activeElement?.id;
+        const scrollY = window.scrollY;
+
+        if (!this.root.hasChildNodes()) {
+            // First render – fast innerHTML path
+            this.root.innerHTML = viewHtml;
+        } else {
+            // Subsequent renders – morph DOM in-place
+            const temp = document.createElement('div');
+            temp.innerHTML = viewHtml;
+            morphChildren(this.root, temp);
+        }
+
+        // Restore focus & scroll
+        if (activeId) {
+            const el = document.getElementById(activeId);
+            if (el && typeof el.focus === 'function') el.focus();
+        }
+        window.scrollTo(0, scrollY);
+
         this.afterRender();
     }
 

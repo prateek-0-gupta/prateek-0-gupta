@@ -1,17 +1,15 @@
-import { useState } from '../framework.js';
+import { useState, registerHandler } from '../framework.js';
 
 export default function Test() {
     const [count, setCount] = useState(0);
-    window.increment = () => {
-        setCount(count + 1);
-    };
+    registerHandler('increment', () => setCount(count + 1));
 
     return `
         <div class="test-page" style="padding: 100px; text-align: center;">
             <h1>Test Page</h1>
             
             <button 
-                onclick="window.increment()"
+                data-action="increment"
                 style="padding: 10px 20px; font-size: 1.2rem; cursor: pointer; margin-top: 20px;"
             >
                 Count is: ${count}
