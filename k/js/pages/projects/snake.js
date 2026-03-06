@@ -2,6 +2,7 @@ import { useEffect, registerHandler } from '../../framework.js';
 import createSoundtrack from './soundtrack.js';
 
 let _cleanup = null;
+let _loreShown = false;
 const soundtrack = createSoundtrack();
 
 export default function SnakePage() {
@@ -15,6 +16,17 @@ export default function SnakePage() {
         const btn = document.getElementById('gs-sound-toggle');
         if (btn) btn.textContent = playing ? '♫' : '♪';
         if (btn) btn.style.opacity = playing ? '1' : '0.5';
+    });
+
+    registerHandler('beginDescent', () => {
+        _loreShown = true;
+        const lore = document.getElementById('loreOverlay');
+        if (lore) lore.style.display = 'none';
+    });
+
+    registerHandler('playAgainVictory', () => {
+        if (_cleanup) { _cleanup(); _cleanup = null; }
+        _cleanup = initGothicSnakeRPG();
     });
 
     useEffect(() => {
@@ -50,8 +62,8 @@ export default function SnakePage() {
                 font-size: 1rem; letter-spacing: 0.12em;
                 color: #d4af37;
                 text-shadow: 0 0 6px rgba(212,175,55,0.5);
+                display: flex; flex-direction: column; gap: 2px;
             }
-            #gs-score span { color: #ffdf73; font-weight: 700; }
             #gs-lives {
                 display: flex; gap: 4px;
             }
@@ -116,12 +128,86 @@ export default function SnakePage() {
                 transition: background 0.3s, border-color 0.3s;
             }
             #gs-sound-toggle:hover { background: rgba(60,40,96,0.4); border-color: #c0a060; }
+
+            .gs-counter { display: block; font-size: 0.85rem; letter-spacing: 0.08em; color: #d4af37; }
+            .gs-counter .gs-val { color: #ffdf73; font-weight: 700; }
+            .gs-counter.soul { color: #b48ede; }
+            .gs-counter.soul .gs-val { color: #d4a5ff; }
+
+            #loreOverlay {
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(6, 3, 5, 0.95);
+                display: none; flex-direction: column; justify-content: center; align-items: center;
+                z-index: 30; font-family: 'Cinzel', serif; color: #c0a060;
+                padding: 40px; text-align: center; overflow-y: auto;
+            }
+            #loreOverlay h1 {
+                font-size: 3rem; letter-spacing: 0.15em; color: #8a1c1c;
+                text-shadow: 0 0 30px rgba(138,28,28,0.6); margin-bottom: 4px;
+            }
+            #loreOverlay h2 {
+                font-size: 1.3rem; letter-spacing: 0.2em; color: #c0a060;
+                margin-bottom: 30px; font-weight: 400;
+            }
+            #loreOverlay .lore-text {
+                max-width: 600px; font-size: 0.95rem; line-height: 1.7;
+                color: #a08850; margin-bottom: 24px;
+                text-shadow: 0 0 6px rgba(0,0,0,0.8);
+            }
+            #loreOverlay .lore-objectives {
+                max-width: 500px; text-align: left; margin-bottom: 24px;
+                border: 1px solid rgba(138,28,28,0.3); padding: 16px 24px;
+                background: rgba(10,7,9,0.6);
+            }
+            #loreOverlay .lore-objectives h3 {
+                font-size: 0.9rem; color: #8a1c1c; margin-bottom: 10px; letter-spacing: 0.1em;
+            }
+            #loreOverlay .lore-objectives li {
+                list-style: none; padding: 4px 0; font-size: 0.85rem; color: #a08850;
+            }
+            #loreOverlay .lore-objectives li::before { content: '◈ '; color: #d4af37; }
+            #loreOverlay .lore-objectives li.soul::before { content: '◈ '; color: #b48ede; }
+            #loreOverlay .lore-controls {
+                font-size: 0.8rem; color: #665533; margin-bottom: 30px; letter-spacing: 0.05em;
+            }
+            #loreOverlay button {
+                padding: 12px 40px; font-size: 1.3rem; background: #120d10; color: #c0a060;
+                border: 1px solid #8a1c1c; cursor: pointer; font-family: 'Cinzel', serif;
+                transition: 0.3s; letter-spacing: 0.1em;
+            }
+            #loreOverlay button:hover { background: #8a1c1c; color: #f0d890; }
+
+            #victoryOverlay {
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(6, 3, 5, 0.92);
+                display: none; flex-direction: column; justify-content: center; align-items: center;
+                z-index: 25; font-family: 'Cinzel', serif; color: #d4af37;
+                padding: 40px; text-align: center;
+            }
+            #victoryOverlay h1 {
+                font-size: 3.5rem; color: #d4af37;
+                text-shadow: 0 0 40px rgba(212,175,55,0.6), 0 0 80px rgba(212,175,55,0.3);
+                margin-bottom: 20px;
+            }
+            #victoryOverlay .victory-text {
+                max-width: 550px; font-size: 1.1rem; line-height: 1.8;
+                color: #c0a060; margin-bottom: 30px;
+            }
+            #victoryOverlay button {
+                padding: 12px 40px; font-size: 1.3rem; background: #120d10; color: #d4af37;
+                border: 1px solid #d4af37; cursor: pointer; font-family: 'Cinzel', serif;
+                transition: 0.3s;
+            }
+            #victoryOverlay button:hover { background: #d4af37; color: #120d10; }
         </style>
 
         <div id="gs-ui">
             <img id="gs-logo" src="js/pages/projects/logo.png" alt="Nagmani" />
             <div id="gs-hud-stats">
-                <div id="gs-score">Mani: <span id="scoreVal">0</span></div>
+                <div id="gs-score">
+                    <span class="gs-counter">Naagmani: <span class="gs-val" id="scoreVal">0</span> / 1000</span>
+                    <span class="gs-counter soul">Soul Shards: <span class="gs-val" id="soulVal">0</span> / 100</span>
+                </div>
                 <div id="gs-lives">
                     <span class="gs-heart"></span>
                     <span class="gs-heart"></span>
@@ -131,6 +217,39 @@ export default function SnakePage() {
         </div>
 
         <div id="gs-quote"></div>
+
+        <div id="loreOverlay">
+            <h1>PATALA'S DESCENT</h1>
+            <h2>The Naga's Requiem</h2>
+            <p class="lore-text">
+                You are <strong>Naagraj</strong> \u2014 the Serpent King of Patala, the sunken underworld.
+                An age ago, the Brass King Kalash invaded your sanctuary, shattered the sacred Nagmani,
+                and scattered the soul of your beloved wife <strong>Amrita</strong> into the void.
+                Now you slither through the ruins of your own kingdom, gathering what was lost.
+            </p>
+            <div class="lore-objectives">
+                <h3>YOUR QUEST</h3>
+                <ul>
+                    <li>Collect <strong>1,000 Naagmani Shards</strong> to restore the sacred gem</li>
+                    <li class="soul">Gather <strong>100 Soul Shards</strong> to channel Amrita's spirit</li>
+                    <li>Soul Shards can <strong>revive you</strong> when death comes (10 shards per revival)</li>
+                    <li>Fulfill both tasks to <strong>revive Amrita</strong> from the eternal dark</li>
+                </ul>
+            </div>
+            <p class="lore-controls">WASD or Arrow Keys to move \u00B7 Beware the fog and the Brass King's soldiers</p>
+            <button data-action="beginDescent">Begin Descent</button>
+        </div>
+
+        <div id="victoryOverlay">
+            <h1>AMRITA REBORN</h1>
+            <p class="victory-text">
+                The Nagmani pulses with golden fire. A thousand shards reunited, a hundred soul fragments
+                woven back into light. The void trembles and parts \u2014 and from the silence,
+                she steps forward. Amrita. Your lotus. Your eternity.<br><br>
+                The Serpent King's requiem is over. Patala breathes again.
+            </p>
+            <button data-action="playAgainVictory">Descend Once More</button>
+        </div>
 
         <div id="gameOverlay">
             <h1>Consumed By The Void</h1>
@@ -148,9 +267,16 @@ function initGothicSnakeRPG() {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const scoreUI = document.getElementById('scoreVal');
+    const soulUI = document.getElementById('soulVal');
     const overlay = document.getElementById('gameOverlay');
     overlay.style.display = 'none';
     scoreUI.innerText = '0';
+    if (soulUI) soulUI.innerText = '0';
+    const victoryOvl = document.getElementById('victoryOverlay');
+    if (victoryOvl) victoryOvl.style.display = 'none';
+    const loreOvl = document.getElementById('loreOverlay');
+    if (loreOvl && !_loreShown) loreOvl.style.display = 'flex';
+    else if (loreOvl) loreOvl.style.display = 'none';
     const livesUI = document.getElementById('gs-lives');
     if (livesUI) {
         livesUI.innerHTML = '<span class="gs-heart"></span><span class="gs-heart"></span><span class="gs-heart"></span>';
@@ -227,6 +353,8 @@ function initGothicSnakeRPG() {
     assets.snakeHead.src = ASSET_BASE + 'snake_head.png';
     assets.snakeBody.src = ASSET_BASE + 'snake_body.png';
     assets.snakeTail.src = ASSET_BASE + 'snake_tail.png';
+    assets.soulShard = new Image();
+    assets.soulShard.src = ASSET_BASE + 'soul_shard.png';
 
     // Once fog texture loads, composite it into the pre-baked vignette
     assets.fog.onload = () => {
@@ -364,7 +492,10 @@ function initGothicSnakeRPG() {
 
     let isDead = false;
     let score = 0;
+    let soulShards = 0;
     let lives = 3;
+    const NAAGMANI_GOAL = 1000;
+    const SOUL_SHARD_GOAL = 100;
     
     // Snake Entity
     const sn = { 
@@ -473,6 +604,30 @@ function initGothicSnakeRPG() {
         });
     }
 
+    function emitSoulShardParticles(x, y) {
+        spawnParticles(x, y, 5, {
+            color: '#b48ede',
+            text: ['\u2726', '\u25C8', '\u27E1', '\u25C7', '\u263D'],
+            font: 'bold 20px serif',
+            minSize: 20, maxSize: 26,
+            speed: 1.5,
+            lifetime: 70,
+            spread: Math.PI * 1.2,
+            baseAngle: -Math.PI / 2,
+            gravity: -0.02,
+            fadeOut: true
+        });
+        spawnParticles(x, y, 10, {
+            color: '#d4a5ff',
+            minSize: 1, maxSize: 4,
+            speed: 2.5,
+            lifetime: 35,
+            spread: Math.PI * 2,
+            gravity: 0.01,
+            fadeOut: true
+        });
+    }
+
     function emitDeathParticles(x, y) {
         spawnParticles(x, y, 30, {
             color: '#8a1c1c',
@@ -505,7 +660,7 @@ function initGothicSnakeRPG() {
 
         const chunk = {
             ox: cx * CW, oy: cy * CW,
-            floor:[], obs: [], food: [], enemies:[],
+            floor:[], obs: [], food: [], enemies:[], soulShards: [],
             shrines: [], bells: [], walls: [], trees: []
         };
 
@@ -642,6 +797,17 @@ function initGothicSnakeRPG() {
             }
         }
 
+        // 5b. Place Soul Shards (rare — ~20% chance, 1 per chunk)
+        if (Math.random() > 0.8) {
+            const pos = tryPlace(12, 20, 20);
+            if (pos) {
+                chunk.soulShards.push({
+                    x: pos.x, y: pos.y,
+                    r: 12, offset: Math.random() * 100
+                });
+            }
+        }
+
         // 6. Place Enemies
         if (!isCenter && Math.random() > 0.4) {
             const pos = tryPlace(20, 30, 15);
@@ -669,6 +835,7 @@ function initGothicSnakeRPG() {
     // Start music on first keypress (browser autoplay policy)
     let musicStarted = false;
     function onFirstKey(e) {
+        if (!_loreShown) return;
         if (!musicStarted && (e.key === 'w' || e.key === 'a' || e.key === 's' || e.key === 'd'
             || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
             musicStarted = true;
@@ -685,11 +852,25 @@ function initGothicSnakeRPG() {
         lives--;
         updateLivesUI();
         if (lives <= 0) {
-            isDead = true;
-            soundtrack.sfxGameOver();
-            if (deathQuoteEl) deathQuoteEl.textContent = '\u201C' + pickQuote('death') + '\u201D';
-            overlay.style.display = 'flex';
-            if (quoteEl) quoteEl.className = 'fading';
+            // Try soul shard revive (costs 10 shards)
+            if (soulShards >= 10) {
+                soulShards -= 10;
+                if (soulUI) soulUI.innerText = soulShards;
+                lives = 1;
+                updateLivesUI();
+                showQuote('death', 3000);
+                soundtrack.sfxRespawn();
+                sn.x = 0; sn.y = 0;
+                sn.angle = 0; sn.targetAngle = 0;
+                sn.len = 10;
+                trail = [];
+            } else {
+                isDead = true;
+                soundtrack.sfxGameOver();
+                if (deathQuoteEl) deathQuoteEl.textContent = '\u201C' + pickQuote('death') + '\u201D';
+                overlay.style.display = 'flex';
+                if (quoteEl) quoteEl.className = 'fading';
+            }
         } else {
             showQuote('death', 3000);
             soundtrack.sfxRespawn();
@@ -712,6 +893,15 @@ function initGothicSnakeRPG() {
         }
     }
 
+    function checkWinCondition() {
+        if (score >= NAAGMANI_GOAL && soulShards >= SOUL_SHARD_GOAL) {
+            isDead = true;
+            soundtrack.sfxGameStart();
+            if (victoryOvl) victoryOvl.style.display = 'flex';
+            if (quoteEl) quoteEl.className = 'fading';
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // UPDATE LOOP
     // ═══════════════════════════════════════════════════════════════════
@@ -720,6 +910,7 @@ function initGothicSnakeRPG() {
 
     function update() {
         if (isDead) return;
+        if (!_loreShown) return;
         time += 0.05;
 
         // Steer the snake
@@ -774,6 +965,7 @@ function initGothicSnakeRPG() {
                         sn.len += 3;             // Grow
                         score++;
                         scoreUI.innerText = score;
+                        checkWinCondition();
                         // Show eat quote (~40% chance)
                         foodEatenSinceLastGrowthQuote++;
                         if (Math.random() < 0.4) showQuote('eat', 3500);
@@ -782,6 +974,21 @@ function initGothicSnakeRPG() {
                             foodEatenSinceLastGrowthQuote = 0;
                             showQuote('growth', 5000);
                         }
+                    }
+                }
+
+                // Collect Soul Shards
+                for (let s = chunk.soulShards.length - 1; s >= 0; s--) {
+                    let shard = chunk.soulShards[s];
+                    let dist = Math.hypot(sn.x - shard.x, sn.y - shard.y);
+                    if (dist < SS + shard.r) {
+                        emitSoulShardParticles(shard.x, shard.y);
+                        soundtrack.sfxEat();
+                        chunk.soulShards.splice(s, 1);
+                        if (soulShards < SOUL_SHARD_GOAL) soulShards++;
+                        if (soulUI) soulUI.innerText = soulShards;
+                        if (Math.random() < 0.6) showQuote('spirit', 3500);
+                        checkWinCondition();
                     }
                 }
 
@@ -916,6 +1123,25 @@ function initGothicSnakeRPG() {
                         ctx.beginPath();
                         ctx.arc(f.x, f.y, f.r + pulse / 2, 0, Math.PI * 2);
                         ctx.fill();
+                    }
+                });
+
+                // Draw Soul Shards (ethereal purple glow)
+                chunk.soulShards.forEach(s => {
+                    const pulse = Math.sin(time * 2 + s.offset) * 4;
+                    const size = (s.r + pulse / 2) * 3;
+                    if (assets.soulShard.complete && assets.soulShard.naturalWidth) {
+                        ctx.globalAlpha = 0.8 + Math.sin(time * 3 + s.offset) * 0.2;
+                        ctx.drawImage(assets.soulShard, s.x - size / 2, s.y - size / 2, size, size);
+                        ctx.globalAlpha = 1;
+                    } else {
+                        ctx.fillStyle = '#b48ede';
+                        ctx.shadowColor = '#8e44ad';
+                        ctx.shadowBlur = 10 + pulse;
+                        ctx.beginPath();
+                        ctx.arc(s.x, s.y, s.r + pulse / 2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
                     }
                 });
 
