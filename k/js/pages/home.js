@@ -1,5 +1,6 @@
 import { useEffect } from '../framework.js';
 import { Footer } from '../components/Footer.js';
+import { POSTERS } from '../poster-manifest.js';
 
 let _jigsawCleanup = null;
 
@@ -8,129 +9,510 @@ export default function Home() {
     useEffect(() => {
         if (_jigsawCleanup) { _jigsawCleanup(); _jigsawCleanup = null; }
         _jigsawCleanup = initJigsawTypography();
+        initBentoGrid();
     }, []);
 
     return `
     <style>
-        .jigsaw-hero {
-            position: relative; width: 100%; height: 100vh;
-            overflow: hidden; background: #0a0a0a;
-        }
-        .jigsaw-hero canvas {
-            display: block; width: 100%; height: 100%; cursor: pointer;
+        .hero-page {
+            position: relative; width: 100%; min-height: 100vh;
+            background: #0a0a0a; overflow: hidden;
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center;
+            padding: 2.5rem;
+            box-sizing: border-box;
         }
 
-        /* Top-left social + projects */
-        .hero-sidebar {
-            position: absolute; top: 2rem; left: 2rem; z-index: 20;
-            display: flex; flex-direction: row; gap: 1.4rem;
+        /* Top-left social row */
+        .hero-social-row {
+            position: absolute; top: 2.5rem; left: 2.5rem; z-index: 20;
+            display: flex; gap: 1.5rem;
         }
-        .hero-social {
-            display: flex; flex-direction: column; gap: 0.75rem;
-        }
-        .hero-social a {
-            display: flex; align-items: center; justify-content: center;
-            width: 36px; height: 36px;
-            color: rgba(255,255,255,0.45);
-            transition: color 0.3s;
-            text-decoration: none;
-        }
-        .hero-social a:hover { color: #fff; }
-        .hero-social a svg { width: 20px; height: 20px; }
-
-        .hero-projects {
-            display: flex; flex-direction: column; gap: 0.5rem;
-            padding-top: 0.6rem;
-            border-top: 1px solid rgba(255,255,255,0.08);
-        }
-        .hero-projects-label {
+        .hero-social-row a {
             font-family: 'Inter', sans-serif;
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            letter-spacing: 0.18em;
-            color: rgba(255,255,255,0.25);
-        }
-        .hero-projects a {
+            font-size: 0.85rem;
             color: rgba(255,255,255,0.5);
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.8rem;
-            letter-spacing: 0.04em;
             text-decoration: none;
             transition: color 0.3s;
+            letter-spacing: 0.02em;
         }
-        .hero-projects a:hover { color: #fff; }
+        .hero-social-row a:hover { color: #fff; }
 
-        /* Bottom-left identity */
-        .hero-identity {
-            position: absolute; bottom: 2.5rem; left: 2rem; z-index: 20;
-            pointer-events: none;
+        /* Right-side links card */
+        .hero-links-card {
+            position: absolute; top: 4rem; left: .5rem; z-index: 20;
+            padding: 2rem 2.2rem;
+            min-width: 240px;
         }
-        .hero-identity .subtitle {
+        .hero-links-card h3 {
             font-family: 'Outfit', sans-serif;
-            font-size: clamp(0.7rem, 1.4vw, 0.9rem);
-            color: rgba(255,255,255,0.45);
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.85);
+            margin: 0 0 1.4rem 0;
+            letter-spacing: -0.01em;
+        }
+        .hero-link-item {
+            margin-bottom: 1.2rem;
+        }
+        .hero-link-item a {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.15rem;
+            font-weight: 500;
+            color: rgba(255,255,255,0.75);
+            text-decoration: none;
+            transition: color 0.3s;
+            display: block;
+        }
+        .hero-link-item a:hover { color: #fff; }
+        .hero-link-item .link-desc {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.3);
+            letter-spacing: 0.04em;
+            margin-top: 0.15rem;
+        }
+
+        /* Bottom identity area */
+        .hero-intro {
+            position: relative; z-index: 20;
+            text-align: center;
+        }
+        .hero-greeting {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+            margin-bottom: 0.6rem;
+            flex-wrap: wrap;
+        }
+        .hero-greeting .text-part {
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(2.4rem, 5.5vw, 5rem);
+            font-weight: 600;
+            color: rgba(255,255,255,0.85);
+            white-space: nowrap;
+        }
+        .jigsaw-inline {
+            position: relative;
+            width: clamp(200px, 28vw, 420px);
+            height: clamp(55px, 7.5vw, 100px);
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .jigsaw-inline canvas {
+            display: block;
+            width: 100%; height: 100%;
+            cursor: pointer;
+        }
+        .hero-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-size: clamp(0.85rem, 1.4vw, 1.05rem);
+            color: rgba(255,255,255,0.35);
+            max-width: 550px;
+            margin: 0.8rem auto 0.6rem;
+            line-height: 1.6;
+        }
+        .hero-meta {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.22);
+            letter-spacing: 0.08em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+        }
+        .hero-meta .dot { opacity: 0.4; }
+
+        @media (max-width: 768px) {
+            .hero-page { padding: 1.5rem; }
+            .hero-social-row { top: 1.5rem; left: 1.5rem; gap: 1rem; }
+            .hero-social-row a { font-size: 0.75rem; }
+            .hero-links-card {
+                position: relative; top: auto; right: auto;
+                margin-top: 5rem; margin-bottom: 2rem;
+                min-width: unset; width: 100%;
+                border-left: none;
+                border-top: 1px solid rgba(255,255,255,0.08);
+                padding: 1.5rem 0 0 0;
+                background: transparent;
+            }
+            .hero-links-card h3 { font-size: 1.2rem; margin-bottom: 1rem; }
+            .hero-link-item a { font-size: 1rem; }
+            .jigsaw-inline {
+                width: clamp(150px, 45vw, 260px);
+                height: clamp(42px, 12vw, 70px);
+            }
+            .hero-greeting .text-part { font-size: clamp(1.6rem, 7vw, 2.4rem); }
+            .hero-intro { padding-bottom: 1rem; }
+        }
+
+        /* ── Bento Grid ── */
+        #bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-auto-rows: minmax(260px, auto);
+            gap: 2px;
+            width: 100%;
+            background: #0a0a0a;
+        }
+        #image-masonry {
+            columns: 4;
+            column-gap: 2px;
+            width: 100%;
+            background: #0a0a0a;
+            margin-top: 2px;
+        }
+        @media (max-width: 1024px) { #image-masonry { columns: 3; } }
+        @media (max-width: 600px)  { #image-masonry { columns: 2; } }
+        .bento-cell {
+            position: relative;
+            overflow: hidden;
+            background: #111;
+        }
+        /* non-image tiles keep a floor height */
+        .bento-project, .bento-video, .bento-label, .bento-stat {
+            min-height: 260px;
+        }
+        /* Project tiles */
+        .bento-project {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 1.8rem 2rem;
+            text-decoration: none;
+            transition: filter 0.3s;
+        }
+        .bento-project::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: inherit;
+            transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
+            z-index: 0;
+        }
+        .bento-project:hover::before { transform: scale(1.04); }
+        .bento-project .bc-tag {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.62rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.35);
+            margin-bottom: 0.6rem;
+            position: relative; z-index: 1;
+        }
+        .bento-project .bc-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(1.4rem, 3vw, 2.4rem);
+            font-weight: 700;
+            color: rgba(255,255,255,0.92);
+            line-height: 1.1;
+            position: relative; z-index: 1;
+        }
+        .bento-project .bc-desc {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.78rem;
+            color: rgba(255,255,255,0.4);
+            margin-top: 0.5rem;
+            position: relative; z-index: 1;
+        }
+        .bento-project .bc-arrow {
+            position: absolute; top: 1.4rem; right: 1.6rem; z-index: 1;
+            font-size: 1rem;
+            color: rgba(255,255,255,0.2);
+            transition: color 0.3s, transform 0.3s;
+        }
+        .bento-project:hover .bc-arrow {
+            color: rgba(255,255,255,0.7);
+            transform: translate(3px, -3px);
+        }
+        /* Image tiles */
+        .bento-image {
+            break-inside: avoid;
+            margin-bottom: 2px;
+            overflow: hidden;
+        }
+        .bento-image img {
+            width: 100%;
+            height: auto;          /* natural aspect ratio — no cropping */
+            display: block;
+            transition: transform 0.6s cubic-bezier(0.16,1,0.3,1), opacity 0.5s ease;
+            opacity: 0;
+        }
+        .bento-image img.loaded { opacity: 1; }
+        .bento-image:hover img { transform: scale(1.03); }
+        .bento-image .bc-img-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 45%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            display: flex; align-items: flex-end; padding: 1rem;
+        }
+        .bento-image:hover .bc-img-overlay { opacity: 1; }
+        .bento-image .bc-img-overlay span {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.68rem;
             letter-spacing: 0.1em;
             text-transform: uppercase;
-            margin-bottom: 0.35rem;
+            color: rgba(255,255,255,0.7);
         }
-        .hero-identity .location {
+        /* Video tiles */
+        .bento-video {
+            padding: 0;
+            background: #000;
+        }
+        .bento-video iframe {
+            width: 100%; height: 100%;
+            border: none;
+            display: block;
+        }
+        /* Label tiles */
+        .bento-label {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 1.8rem 2rem;
+        }
+        .bento-label .bc-lbl-main {
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(1rem, 2.5vw, 1.8rem);
+            font-weight: 600;
+            color: rgba(255,255,255,0.88);
+            line-height: 1.2;
+        }
+        .bento-label .bc-lbl-sub {
             font-family: 'Inter', sans-serif;
-            font-size: 0.65rem;
-            color: rgba(255,255,255,0.28);
-            letter-spacing: 0.12em;
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            display: flex; align-items: center; gap: 0.35rem;
+            color: rgba(255,255,255,0.3);
+            margin-top: 0.5rem;
         }
-
-        /* Below-hero */
-        .home-below { background: var(--bg); position: relative; z-index: 1; }
-
+        /* Stat tiles */
+        .bento-stat {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 1.8rem 2rem;
+        }
+        .bento-stat .bc-stat-num {
+            font-family: 'Outfit', sans-serif;
+            font-size: clamp(2.5rem, 6vw, 5rem);
+            font-weight: 700;
+            color: rgba(255,255,255,0.85);
+            line-height: 1;
+        }
+        .bento-stat .bc-stat-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.3);
+            margin-top: 0.5rem;
+        }
+        @media (max-width: 1024px) {
+            #bento-grid { grid-template-columns: repeat(6, 1fr); }
+        }
         @media (max-width: 600px) {
-            .hero-sidebar { top: 1.2rem; left: 1.2rem; }
-            .hero-identity { bottom: 1.2rem; left: 1.2rem; }
+            #bento-grid { grid-template-columns: repeat(4, 1fr); }
+            .bento-project, .bento-video, .bento-label, .bento-stat { min-height: 180px; }
         }
     </style>
 
-    <div class="jigsaw-hero">
-        <canvas id="typeCanvas"></canvas>
-
-        <div class="hero-sidebar">
-            <div class="hero-social">
-                <a href="mailto:prateekgupta1198@gmail.com" title="Email" aria-label="Email">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-                </a>
-                <a href="https://www.linkedin.com/in/prateek-gupta08" target="_blank" title="LinkedIn" aria-label="LinkedIn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect width="4" height="12" x="2" y="9"/><circle cx="4" cy="4" r="2"/></svg>
-                </a>
-                <a href="https://www.instagram.com/chai.and.photoshop" target="_blank" title="Instagram" aria-label="Instagram">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
-                </a>
+    <div class="hero-page">
+        <div class="hero-social-row">
+            <a href="https://www.instagram.com/chai.and.photoshop" target="_blank">Instagram</a>
+            <a href="https://www.linkedin.com/in/prateek-gupta08" target="_blank">linkedin</a>
+            <a href="mailto:prateekgupta1198@gmail.com">e-mail</a>
+        </div>
+        <div class="hero-intro">
+            <div class="hero-greeting">
+                <span class="text-part">Hi, I am</span>
+                <div class="jigsaw-inline">
+                    <canvas id="typeCanvas"></canvas>
+                </div>
             </div>
-            <div class="hero-projects">
-                <span class="hero-projects-label">Projects</span>
-                <a href="/snake" data-link>NaagMani - a snake game</a>
+            <div class="hero-subtitle">i am a software engineer and a creative future media practitioner</div>
+            <div class="hero-meta">
+                <span>I am based in Manchester, UK</span>
+                <span class="dot">-</span>
+                <span> and I work at Sum Vivas Ltd</span>
             </div>
         </div>
-
-        <div class="hero-identity">
-            <div class="subtitle">Hi, I am Prateek, i am a software engineer and a creative future media practitioner</div>
-            <div class="location">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                Manchester, UK
-                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                Sum Vivas Ltd
+         <div class="hero-links-card">
+            <h3></h3>
+            <div class="hero-link-item">
+                <a href="/snake" data-link>Nagmani</a>
+                <div class="link-desc">an Indian gothic snake game</div>
             </div>
-        
+            <div class="hero-link-item">
+                <a href="/baoli" data-link>Baoli</a>
+                <div class="link-desc">a three js based experience</div>
+            </div>
+            <div class="hero-link-item">
+                <a href="https://avatar.sumvivas.com" target="_blank">Digital Human</a>
+                <div class="link-desc">three.js based AI-driven Digital Human </div>
+            </div>
+            <div class="hero-link-item">
+                <a href="https://youtu.be/xPZ85jpZTsw" target="_blank">Digital Doppelgänger</a>
+                <div class="link-desc">A Short Film</div>
+            </div>
+            
+        </div>
+        <div style="position: absolute; bottom: 1.5rem; font-family: 'Inter', sans-serif; font-size: 0.75rem; color: rgba(255,255,255,0.3); z-index: 20; letter-spacing: 0.08em;">
+            scroll ↓
         </div>
     </div>
 
-   
+    <div id="bento-grid"></div>
+    <div id="image-masonry"></div>
     `;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   JIGSAW TYPOGRAPHY ENGINE
-   ═══════════════════════════════════════════════════════════════════ */
+
+const BENTO_ITEMS = [
+  
+    {
+        type: 'video',
+        title: 'Digital Doppelgänger',
+        videoId: 'xPZ85jpZTsw',
+    },
+    ...POSTERS.map(p => ({
+        type: 'image',
+        src: `js/pages/projects/posters/assets/${p.file}`,
+        title: p.title || p.file,
+    })),
+];
+
+const SPAN_POOLS = {
+    project:  [ [4,2],[4,2],[4,3],[6,2],[3,2],[3,3] ],
+    video:    [ [6,2],[6,3],[4,2],[4,3] ],
+    image:    [ [3,2],[3,3],[4,2],[2,2],[2,3],[4,3],[5,2],[6,3] ],
+    label:    [ [3,1],[2,1],[3,2],[2,2],[4,1] ],
+    stat:     [ [2,1],[2,2],[3,1] ],
+};
+
+function bentoSpan(item) {
+    const pool = SPAN_POOLS[item.type] || [[3,2]];
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function renderBentoCell(item) {
+    switch (item.type) {
+        case 'project': {
+            const tag = item.internal ? 'project' : 'external';
+            const arrow = item.internal ? '↗' : '↗';
+            return `
+                <a class="bento-cell bento-project"
+                   style="background:${item.bg};"
+                   ${item.internal ? `href="${item.href}" data-link` : `href="${item.href}" target="_blank" rel="noopener"`}>
+                    <span class="bc-arrow">${arrow}</span>
+                    <span class="bc-tag">${tag}</span>
+                    <div class="bc-title">${item.title}</div>
+                    <div class="bc-desc">${item.desc}</div>
+                </a>`;
+        }
+        case 'image': {
+            return `
+                <div class="bento-cell bento-image">
+                    <img data-src="${item.src}" alt="${item.title}"
+                         onerror="this.closest('.bento-cell').style.display='none'">
+                    <div class="bc-img-overlay"><span>${item.title}</span></div>
+                </div>`;
+        }
+        case 'video': {
+            return `
+                <div class="bento-cell bento-video">
+                    <iframe
+                        src="https://www.youtube.com/embed/${item.videoId}?rel=0&modestbranding=1"
+                        title="${item.title}"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen
+                        loading="lazy">
+                    </iframe>
+                </div>`;
+        }
+        case 'label': {
+            const lines = item.main.split('\n').join('<br>');
+            return `
+                <div class="bento-cell bento-label" style="background:${item.bg};">
+                    <div class="bc-lbl-main">${lines}</div>
+                    <div class="bc-lbl-sub">${item.sub}</div>
+                </div>`;
+        }
+        case 'stat': {
+            return `
+                <div class="bento-cell bento-stat" style="background:${item.bg};">
+                    <div class="bc-stat-num">${item.num}</div>
+                    <div class="bc-stat-label">${item.label}</div>
+                </div>`;
+        }
+        default: return '';
+    }
+}
+
+function initBentoGrid() {
+    const grid    = document.getElementById('bento-grid');
+    const masonry = document.getElementById('image-masonry');
+    if (!grid || !masonry) return;
+
+    // Shuffle all items
+    const all = [...BENTO_ITEMS];
+    for (let i = all.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [all[i], all[j]] = [all[j], all[i]];
+    }
+
+    const primaryItems = all.filter(it => it.type !== 'image');
+    const imageItems   = all.filter(it => it.type === 'image');
+
+    // ── Primary bento grid (projects, videos, labels, stats) ────────────
+    const fragGrid = document.createDocumentFragment();
+    const wrapper  = document.createElement('div');
+    primaryItems.forEach(item => {
+        const [cs, rs] = bentoSpan(item);
+        const html = renderBentoCell(item);
+        wrapper.innerHTML = html.trim();
+        const el = wrapper.firstChild;
+        if (!el) return;
+        el.style.gridColumn = `span ${cs}`;
+        el.style.gridRow    = `span ${rs}`;
+        fragGrid.appendChild(el);
+    });
+    grid.innerHTML = '';
+    grid.appendChild(fragGrid);
+
+    // ── Image masonry (CSS columns — natural aspect ratio, no gaps) ──────
+    const fragMasonry = document.createDocumentFragment();
+    imageItems.forEach(item => {
+        const html = renderBentoCell(item);
+        wrapper.innerHTML = html.trim();
+        const el = wrapper.firstChild;
+        if (!el) return;
+        fragMasonry.appendChild(el);
+    });
+    masonry.innerHTML = '';
+    masonry.appendChild(fragMasonry);
+
+    // ── Lazy load via IntersectionObserver ───────────────────────────────
+    const lazyObs = new IntersectionObserver((entries, obs) => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const img = entry.target;
+            img.src = img.dataset.src;
+            img.onload  = () => img.classList.add('loaded');
+            img.onerror = () => img.closest('.bento-cell').style.display = 'none';
+            obs.unobserve(img);
+        });
+    }, { rootMargin: '200px 0px' }); // start loading 200px before entering viewport
+
+    masonry.querySelectorAll('img[data-src]').forEach(img => lazyObs.observe(img));
+}
+
+//     TYPOGRAPHY ENGINE
 
 const ALPHABET = {
   A:{o:[0.615,0.024,0.36,0.024,0.054,0.957,0.309,0.957,0.329,0.704,0.628,0.696,0.639,0.943,0.954,0.957,0.615,0.024],h:[[0.398,0.414,0.449,0.15,0.529,0.152,0.578,0.414,0.398,0.414]]},
@@ -167,15 +549,19 @@ function initJigsawTypography() {
     const ctx = canvas.getContext('2d');
 
     const TEXT = 'PRATEEK';
-    const DISTORTION = 0.4;
+    const DISTORTION = 0.2;
     const GAP = 0.04;
-    const SHADOW_DEPTH = 12;
-    const SPEED_MS = 2500;
+    const SHADOW_DEPTH = 4;
+    const SPEED_MS = 2000;
 
     function resizeCanvas() {
-        const hero = canvas.parentElement;
-        canvas.width = hero.clientWidth;
-        canvas.height = hero.clientHeight;
+        const container = canvas.parentElement;
+        const dpr = window.devicePixelRatio || 1;
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         generate(true);
     }
     window.addEventListener('resize', resizeCanvas);
@@ -252,18 +638,21 @@ function initJigsawTypography() {
         if (regenerateGrid || !currentPalette) {
             currentPalette = randomMonoPalette();
             const hero = canvas.parentElement;
-            if (hero) hero.style.backgroundColor = currentPalette.bg;
+            if (hero) hero.style.backgroundColor = 'transparent';
         }
 
+        const dpr = window.devicePixelRatio || 1;
+        const displayW = canvas.width / dpr;
+        const displayH = canvas.height / dpr;
         const text = TEXT;
         const fillColor = currentPalette.fg;
         const shadowCol = currentPalette.shadow;
-        const PADDING = Math.min(canvas.width, canvas.height) * 0.06;
+        const PADDING = Math.min(displayW, displayH) * 0.04;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, displayW, displayH);
 
         if (regenerateGrid || currentBoundaries.length !== text.length + 1) {
-            currentBoundaries = generateBoundaries(text.length, canvas.width, canvas.height, PADDING, DISTORTION);
+            currentBoundaries = generateBoundaries(text.length, displayW, displayH, PADDING, DISTORTION);
         }
 
         for (let i = 0; i < text.length; i++) {

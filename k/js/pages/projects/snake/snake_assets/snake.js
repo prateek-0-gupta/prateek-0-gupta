@@ -1,4 +1,4 @@
-import { useEffect, registerHandler } from '../../../framework.js';
+import { useEffect, registerHandler } from '../../../../framework.js';
 import createSoundtrack from './soundtrack.js';
 
 let _cleanup = null;
@@ -264,7 +264,7 @@ export default function SnakePage() {
         </style>
 
         <div id="gs-ui">
-           
+            // <img id="gs-logo" src="js/pages/projects/logo.png" alt="Nagmani" />
             <div id="gs-hud-stats">
                 <div id="gs-score">
                     <span class="gs-counter">Naagmani: <span class="gs-val" id="scoreVal">0</span> / 1000</span>
@@ -281,7 +281,7 @@ export default function SnakePage() {
         <div id="gs-quote"></div>
 
         <div id="loadingOverlay">
-            <img class="load-logo" src="js/pages/projects/snake/snake_assets/logo.png" alt="" />
+            <img class="load-logo" src="js/pages/projects/logo.png" alt="" />
             <div class="load-title">AMRITA</div>
             <div class="load-sub">The Naga's Requiem</div>
             <div class="load-bar-wrap"><div class="load-bar" id="loadBar"></div></div>
@@ -290,7 +290,7 @@ export default function SnakePage() {
 
         <div id="loreOverlay">
             <div class="lore-inner">
-                <img class="lore-logo" src="js/pages/projects/snake/snake_assets/logo.png" alt="" />
+                <img class="lore-logo" src="js/pages/projects/logo.png" alt="" />
                 <h1>Amrita</h1>
                 <h2>The Naga's Requiem</h2>
                 <div class="lore-divider"></div>
@@ -393,7 +393,7 @@ function initGothicSnakeRPG() {
 
     // Floor tile pattern
     const floorImg = new Image();
-    floorImg.src = 'js/pages/projects/snake/snake_assets/floor-tile.png';
+    floorImg.src = 'js/pages/projects/floor-tile.png';
     let floorPattern = null;
     floorImg.onload = () => {
         floorPattern = ctx.createPattern(floorImg, 'repeat');
@@ -401,7 +401,7 @@ function initGothicSnakeRPG() {
 
     // Puddle tile for floor variation
     const puddleImg = new Image();
-    puddleImg.src = 'js/pages/projects/snake/snake_assets/floor-tile-puddle.png';
+    puddleImg.src = 'js/pages/projects/floor-tile-puddle.png';
 
     // Sprite assets
     const assets = {
@@ -421,7 +421,7 @@ function initGothicSnakeRPG() {
         fallenStatue:  new Image(),
         fallenStatue1: new Image(),
     };
-    const ASSET_BASE = 'js/pages/projects/snake/snake_assets/';
+    const ASSET_BASE = 'js/pages/projects/';
     assets.pillar.src    = ASSET_BASE + 'pillar.png';
     assets.bell.src      = ASSET_BASE + 'bell.png';
     assets.shrine.src    = ASSET_BASE + 'shrine.png';
