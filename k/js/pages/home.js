@@ -353,6 +353,10 @@ export default function Home() {
                 <div class="link-desc">a three js based experience</div>
             </div>
             <div class="hero-link-item">
+                <a href="/kettleindex" data-link>Kettle Index</a>
+                <div class="link-desc">token energy & carbon calculator</div>
+            </div>
+            <div class="hero-link-item">
                 <a href="https://avatar.sumvivas.com" target="_blank">Digital Human</a>
                 <div class="link-desc">three.js based AI-driven Digital Human </div>
             </div>
@@ -362,13 +366,10 @@ export default function Home() {
             </div>
             
         </div>
-        <div style="position: absolute; bottom: 1.5rem; font-family: 'Inter', sans-serif; font-size: 0.75rem; color: rgba(255,255,255,0.3); z-index: 20; letter-spacing: 0.08em;">
-            scroll ↓
-        </div>
+        
     </div>
 
-    <div id="bento-grid"></div>
-    <div id="image-masonry"></div>
+    
     `;
 }
 

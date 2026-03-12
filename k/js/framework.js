@@ -130,6 +130,11 @@ export default class Framework {
         this.init();
     }
 
+    isInBasePath(path) {
+        if (!this.basePath) return false;
+        return path === this.basePath || path.startsWith(this.basePath + '/');
+    }
+
     init() {
         window.addEventListener('popstate', () => this.handleRoute());
         
@@ -157,7 +162,7 @@ export default class Framework {
 
     navigateTo(url) {
         let fullPath = url;
-        if (url.startsWith('/') && this.basePath && !url.startsWith(this.basePath)) {
+        if (url.startsWith('/') && this.basePath && !this.isInBasePath(url)) {
             fullPath = this.basePath + url;
         }
 
@@ -175,8 +180,8 @@ export default class Framework {
         const path = window.location.pathname;
         let mappedPath = path;
 
-        if (this.basePath && path.startsWith(this.basePath)) {
-            mappedPath = path.slice(this.basePath.length);
+        if (this.basePath && this.isInBasePath(path)) {
+            mappedPath = path.slice(this.basePath.length) || '/';
         }
         mappedPath = this.normalizePath(mappedPath);
 

@@ -3,6 +3,7 @@ import Home from './pages/home.js';
 import Test from './pages/test.js';
 import Snake from './pages/projects/snake/snake.js';
 import Baoli from './pages/projects/baoli/baoli.js';
+import KettleIndex from './pages/projects/kettleindex/kettleindex.js';
 
 const routes = {
     '/': Home,
@@ -11,6 +12,7 @@ const routes = {
     '/test': Test,
     '/snake': Snake,
     '/baoli': Baoli,
+    '/kettleindex': KettleIndex,
 };
 
 const app = new Framework(routes, '/k');
