@@ -34,11 +34,34 @@ async function joinRoom(roomId, nickname) {
             'wss://tracker.openwebtorrent.com',
             'wss://tracker.webtorrent.dev',
             'wss://tracker.files.fm:7073/announce',
+            'wss://tracker.novage.com.ua',
         ],
+        relayRedundancy: 3,
         rtcConfig: {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun.relay.metered.ca:80' },
+                {
+                    urls: 'turn:global.relay.metered.ca:80',
+                    username: 'e8dd65b092c0bb1daab85669',
+                    credential: '1PgJMHbr8h/u/HdM',
+                },
+                {
+                    urls: 'turn:global.relay.metered.ca:80?transport=tcp',
+                    username: 'e8dd65b092c0bb1daab85669',
+                    credential: '1PgJMHbr8h/u/HdM',
+                },
+                {
+                    urls: 'turn:global.relay.metered.ca:443',
+                    username: 'e8dd65b092c0bb1daab85669',
+                    credential: '1PgJMHbr8h/u/HdM',
+                },
+                {
+                    urls: 'turns:global.relay.metered.ca:443?transport=tcp',
+                    username: 'e8dd65b092c0bb1daab85669',
+                    credential: '1PgJMHbr8h/u/HdM',
+                },
             ]
         }
     }, roomId);

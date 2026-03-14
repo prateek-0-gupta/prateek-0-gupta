@@ -552,12 +552,14 @@ footer {
 
 .p2p-root {
     min-height: 100vh;
+    min-height: 100dvh;
     background: #0a0a0a;
     font-family: 'Inter', -apple-system, system-ui, sans-serif;
     color: #e0e0e0;
     display: flex;
     justify-content: center;
     align-items: center;
+    overflow: hidden;
 }
 .p2p-lobby {
     max-width: 420px;
@@ -671,8 +673,10 @@ footer {
     width: 100%;
     max-width: 600px;
     height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 .p2p-header {
     display: flex;
@@ -816,4 +820,6 @@ footer {
     .p2p-lobby { padding: 2rem 1.2rem; }
     .p2p-title { font-size: 1.6rem; }
     .p2p-msg { max-width: 92%; }
+    .p2p-chat-container { height: -webkit-fill-available; }
+    .p2p-input-bar { padding-bottom: env(safe-area-inset-bottom, 0.8rem); }
 }
