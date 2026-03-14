@@ -817,3 +817,129 @@ footer {
     .p2p-title { font-size: 1.6rem; }
     .p2p-msg { max-width: 92%; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   BVH Viewer
+   ══════════════════════════════════════════════════════════════════════ */
+
+.bvh-root {
+    min-height: 100vh;
+    background: #0a0a0a;
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+}
+.bvh-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.7rem 1.2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+    z-index: 10;
+}
+.bvh-back {
+    color: rgba(255,255,255,0.4);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: color 0.3s;
+}
+.bvh-back:hover { color: #fff; }
+.bvh-toolbar-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    flex: 1;
+}
+.bvh-toolbar-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+.bvh-tool-btn {
+    padding: 0.4rem 0.7rem;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.bvh-tool-btn:hover {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.25);
+    color: #fff;
+}
+.bvh-canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+}
+.bvh-canvas-wrap canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+.bvh-canvas-wrap.bvh-dragover {
+    outline: 2px dashed rgba(99,200,255,0.5);
+    outline-offset: -4px;
+}
+.bvh-drop-zone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 5;
+    pointer-events: none;
+}
+.bvh-drop-icon {
+    font-size: 3rem;
+    opacity: 0.2;
+    margin-bottom: 1rem;
+}
+.bvh-drop-text {
+    font-size: 0.95rem;
+    color: rgba(255,255,255,0.35);
+    text-align: center;
+    line-height: 1.6;
+}
+.bvh-drop-text strong {
+    color: rgba(255,255,255,0.6);
+}
+.bvh-drop-hint {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.18);
+    margin-top: 0.6rem;
+    letter-spacing: 0.05em;
+}
+.bvh-status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1.2rem;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.3);
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+}
+.bvh-info-panel {
+    padding: 0.8rem 1.2rem;
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.2);
+    line-height: 1.6;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
+}
+
+@media (max-width: 500px) {
+    .bvh-toolbar { flex-wrap: wrap; gap: 0.5rem; }
+    .bvh-toolbar-title { font-size: 0.85rem; }
+    .bvh-tool-btn { padding: 0.35rem 0.5rem; font-size: 0.72rem; }
+}

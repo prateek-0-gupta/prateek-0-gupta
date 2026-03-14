@@ -60,6 +60,10 @@ export default function Home() {
                 <a href="/p2pchat" data-link>p2p chat</a>
                 <div class="link-desc">a serverless p2p chat</div>
             </div>
+            <div class="hero-link-item">
+                <a href="/bvhviewer" data-link>BVH Viewer</a>
+                <div class="link-desc">a BVH file viewer</div>
+            </div>
         </div>
         
     </div>
