@@ -22,7 +22,7 @@ function addMessage(msg) {
 }
 
 async function joinRoom(roomId, nickname) {
-    const { joinRoom: trysteroJoin } = await import('https://esm.sh/trystero/torrent');
+    const { joinRoom: trysteroJoin } = await import('https://esm.sh/trystero@0.20.0/torrent');
 
     if (room) room.leave();
     messageLog = [];
