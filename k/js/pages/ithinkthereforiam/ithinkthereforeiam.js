@@ -170,6 +170,7 @@ function initCanvas() {
     let dragCard = null;
     let dragOffset = { x: 0, y: 0 };
     let dragMoved = false;
+    let dragGhost = null;
 
     // --- Convenience wrappers ---
     function doRenderAll() {
@@ -311,8 +312,14 @@ function initCanvas() {
             if (card) {
                 card.x = pos.x - dragOffset.x;
                 card.y = pos.y - dragOffset.y;
+                // Update original (hidden) card position
                 const el = surface.querySelector(`.canvas-card[data-id="${dragCard}"]`);
                 if (el) { el.style.left = card.x + 'px'; el.style.top = card.y + 'px'; }
+                // Move drag ghost to cursor
+                if (dragGhost) {
+                    dragGhost.style.left = (e.clientX - dragOffset.x * ctx.viewport.zoom) + 'px';
+                    dragGhost.style.top = (e.clientY - dragOffset.y * ctx.viewport.zoom) + 'px';
+                }
 
                 const col = columnAtCanvasPoint(ctx, card.x + 90, card.y + 30);
                 kanbanBoard.querySelectorAll('.kb-col').forEach(c =>
@@ -334,7 +341,9 @@ function initCanvas() {
 
         if (dragCard) {
             const el = surface.querySelector(`.canvas-card[data-id="${dragCard}"]`);
-            if (el) el.classList.remove('dragging');
+            if (el) { el.classList.remove('dragging'); el.style.opacity = ''; }
+            // Remove drag ghost
+            if (dragGhost) { dragGhost.remove(); dragGhost = null; }
             const card = ctx.state.cards.find(c => c.id === dragCard);
 
             if (card && dragMoved) {
@@ -424,6 +433,19 @@ function initCanvas() {
             dragMoved = false;
             dragOffset = { x: pos.x - card.x, y: pos.y - card.y };
             cardEl.classList.add('dragging');
+            // Create a fixed-position ghost so the card floats above sidebar panels
+            cardEl.style.opacity = '0.3';
+            dragGhost = cardEl.cloneNode(true);
+            dragGhost.classList.remove('dragging');
+            dragGhost.style.position = 'fixed';
+            dragGhost.style.zIndex = '2000';
+            dragGhost.style.pointerEvents = 'none';
+            dragGhost.style.opacity = '0.9';
+            dragGhost.style.transform = 'scale(1.04) rotate(1deg)';
+            dragGhost.style.boxShadow = 'var(--shadow-lg)';
+            dragGhost.style.left = (e.clientX - dragOffset.x * ctx.viewport.zoom) + 'px';
+            dragGhost.style.top = (e.clientY - dragOffset.y * ctx.viewport.zoom) + 'px';
+            root.appendChild(dragGhost);
         }
     });
 
