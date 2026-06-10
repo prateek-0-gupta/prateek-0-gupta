@@ -64,6 +64,10 @@ export default function Home() {
                 <a href="/bvhviewer" data-link>BVH Viewer</a>
                 <div class="link-desc">a BVH file viewer</div>
             </div>
+            <div class="hero-link-item">
+                <a href="/ithinkthereforiam" data-link>I Think Therefore I Am</a>
+                <div class="link-desc">an infinite thought canvas</div>
+            </div>
         </div>
         
     </div>
