@@ -21,478 +21,7 @@ export default function IThinkThereforeIAm() {
 
     return `
     <div id="canvas-root">
-        <style>
-            @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Caveat:wght@400;500;600;700&display=swap');
-
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body, html { width: 100%; height: 100%; overflow: hidden; }
-
-            #canvas-root {
-                width: 100%; height: 100vh; overflow: hidden;
-                background: #F7F6F3;
-                font-family: 'Space Grotesk', sans-serif;
-                color: #1A1A1A;
-                position: relative;
-                cursor: grab;
-            }
-            #canvas-root.grabbing { cursor: grabbing; }
-            #canvas-root.sketching { cursor: crosshair; }
-
-            #canvas-surface {
-                position: absolute; top: 0; left: 0;
-                width: 100%; height: 100%;
-                transform-origin: 0 0;
-            }
-
-            #canvas-grid {
-                position: absolute; top: -2000px; left: -2000px;
-                width: 6000px; height: 6000px;
-                pointer-events: none;
-                opacity: 0.3;
-                background-image: radial-gradient(circle, #ccc 1px, transparent 1px);
-                background-size: 40px 40px;
-            }
-
-            #app-title {
-                position: fixed; top: 14px; left: 20px;
-                z-index: 900; pointer-events: none;
-                line-height: 1.1;
-            }
-            #app-title .cogito {
-                font-family: 'Caveat', cursive;
-                font-size: 22px; font-weight: 600;
-            }
-            #app-title .tagline {
-                font-size: 10px; letter-spacing: 1.2px;
-                text-transform: uppercase; color: #b5b2ab;
-            }
-
-            #empty-hint {
-                position: fixed; top: 50%; left: 50%;
-                transform: translate(-50%, -50%);
-                text-align: center; pointer-events: none;
-                z-index: 1; transition: opacity 0.4s;
-            }
-            #empty-hint .big {
-                font-family: 'Caveat', cursive;
-                font-size: 44px; color: #c9c6bf;
-            }
-            #empty-hint .small {
-                font-size: 12px; color: #c9c6bf;
-                letter-spacing: 0.5px; margin-top: 6px;
-            }
-            #empty-hint.hidden { opacity: 0; }
-
-            #sketch-canvas {
-                position: absolute; top: 0; left: 0;
-                width: 100%; height: 100%;
-                pointer-events: none;
-                z-index: 5;
-            }
-            #sketch-canvas.active { pointer-events: all; cursor: crosshair; }
-
-            .canvas-card {
-                position: absolute;
-                min-width: 180px;
-                max-width: 280px;
-                padding: 16px 18px 20px;
-                border-radius: 6px;
-                font-family: 'Caveat', cursive;
-                font-size: 19px;
-                line-height: 1.35;
-                cursor: grab;
-                user-select: none;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
-                z-index: 10;
-                transition: box-shadow 0.2s;
-                word-wrap: break-word;
-                overflow-wrap: break-word;
-            }
-            .canvas-card.longform {
-                font-family: 'Space Grotesk', sans-serif;
-                font-size: 13px; line-height: 1.5;
-            }
-            .canvas-card::before {
-                content: '';
-                position: absolute;
-                bottom: -7px; left: 14px;
-                width: 8px; height: 8px;
-                border-radius: 50%;
-                background: inherit;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.07);
-            }
-            .canvas-card::after {
-                content: '';
-                position: absolute;
-                bottom: -13px; left: 8px;
-                width: 4px; height: 4px;
-                border-radius: 50%;
-                background: inherit;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-            }
-            .canvas-card:hover {
-                box-shadow: 0 4px 16px rgba(0,0,0,0.12), 0 2px 4px rgba(0,0,0,0.08);
-            }
-            .canvas-card.dragging {
-                box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-                transform: scale(1.04) rotate(1deg);
-                z-index: 100;
-                cursor: grabbing;
-            }
-            .canvas-card.selected {
-                box-shadow: 0 0 0 2px rgba(26,26,26,0.55), 0 4px 16px rgba(0,0,0,0.12);
-            }
-            .canvas-card .card-text { outline: none; min-height: 24px; }
-            .canvas-card .card-text:focus { cursor: text; user-select: text; }
-
-            .canvas-card .card-delete {
-                position: absolute; top: 3px; right: 5px;
-                width: 18px; height: 18px;
-                border: none; background: none;
-                cursor: pointer; opacity: 0;
-                font-size: 12px; color: #666;
-                border-radius: 50%;
-                display: flex; align-items: center; justify-content: center;
-                transition: opacity 0.2s;
-            }
-            .canvas-card:hover .card-delete { opacity: 0.6; }
-            .canvas-card .card-delete:hover { opacity: 1; background: rgba(0,0,0,0.08); }
-
-            .canvas-card .card-color-picker {
-                position: absolute; bottom: 5px; right: 7px;
-                display: none; gap: 3px;
-            }
-            .canvas-card:hover .card-color-picker { display: flex; }
-            .card-color-dot {
-                width: 11px; height: 11px;
-                border-radius: 50%; border: 1.5px solid rgba(0,0,0,0.15);
-                cursor: pointer;
-                transition: transform 0.15s;
-            }
-            .card-color-dot:hover { transform: scale(1.35); }
-
-            .card-slot-badge {
-                position: absolute; top: -9px; right: 10px;
-                font-family: 'Space Grotesk', sans-serif;
-                font-size: 9px; font-weight: 600;
-                letter-spacing: 0.8px; text-transform: uppercase;
-                background: #1A1A1A; color: #fff;
-                padding: 2px 7px; border-radius: 8px;
-            }
-
-            .chk { display: flex; align-items: baseline; gap: 7px; }
-            .chk-box {
-                flex: 0 0 auto;
-                width: 14px; height: 14px;
-                border: 1.5px solid rgba(26,26,26,0.4);
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 10px; line-height: 12px;
-                text-align: center;
-                font-family: 'Space Grotesk', sans-serif;
-                background: rgba(255,255,255,0.5);
-                transform: translateY(2px);
-            }
-            .chk.done .chk-box { background: #1A1A1A; color: #fff; border-color: #1A1A1A; }
-            .chk.done span:last-child { text-decoration: line-through; opacity: 0.5; }
-
-            .card-yellow { background: #FFF3B0; }
-            .card-sage { background: #D4E9D7; }
-            .card-lavender { background: #E8DEFF; }
-            .card-coral { background: #FFD6CC; }
-            .card-sky { background: #D0EFFF; }
-
-            #kanban-board {
-                position: absolute;
-                display: none;
-                z-index: 2;
-                pointer-events: none;
-            }
-            #kanban-board.visible { display: flex; }
-            .kb-col {
-                width: 260px; height: 640px;
-                border: 2px dashed rgba(26,26,26,0.1);
-                border-radius: 14px;
-                margin-right: 14px;
-                padding-top: 14px;
-                text-align: center;
-                transition: background 0.15s, border-color 0.15s;
-            }
-            .kb-col.drag-over {
-                background: rgba(26,26,26,0.035);
-                border-color: rgba(26,26,26,0.25);
-            }
-            .kb-col .kb-header {
-                display: inline-block;
-                font-size: 11px; font-weight: 600;
-                text-transform: uppercase; letter-spacing: 1.5px;
-                color: #999; padding: 7px 14px;
-                border-radius: 20px;
-                background: rgba(255,255,255,0.85);
-            }
-            .kb-col .count {
-                margin-left: 6px;
-                background: rgba(0,0,0,0.08);
-                padding: 2px 6px; border-radius: 8px;
-                font-size: 10px;
-            }
-
-            #canvas-toolbar {
-                position: fixed; bottom: 24px; left: 50%;
-                transform: translateX(-50%);
-                display: flex; gap: 4px;
-                padding: 8px 12px;
-                background: rgba(255,255,255,0.85);
-                backdrop-filter: blur(12px);
-                border-radius: 16px;
-                border: 1px solid rgba(0,0,0,0.06);
-                box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-                z-index: 1000;
-                font-size: 13px;
-            }
-            .toolbar-btn {
-                width: 40px; height: 40px;
-                border: none; background: none;
-                border-radius: 10px;
-                cursor: pointer;
-                display: flex; align-items: center; justify-content: center;
-                font-size: 18px;
-                color: #555;
-                position: relative;
-                transition: background 0.15s, color 0.15s;
-            }
-            .toolbar-btn:hover { background: rgba(0,0,0,0.05); color: #1A1A1A; }
-            .toolbar-btn.active { background: #1A1A1A; color: #fff; }
-            .toolbar-btn:focus-visible { outline: 2px solid #1A1A1A; outline-offset: 2px; }
-            .toolbar-btn .tooltip {
-                position: absolute; bottom: calc(100% + 8px);
-                left: 50%; transform: translateX(-50%);
-                background: #1A1A1A; color: #fff;
-                padding: 4px 10px; border-radius: 6px;
-                font-size: 11px; white-space: nowrap;
-                opacity: 0; pointer-events: none;
-                transition: opacity 0.2s;
-            }
-            .toolbar-btn:hover .tooltip, .toolbar-btn:focus-visible .tooltip { opacity: 1; }
-            .toolbar-divider { width: 1px; margin: 4px 6px; background: rgba(0,0,0,0.1); }
-
-            #sketch-palette {
-                position: fixed; bottom: 84px; left: 50%;
-                transform: translateX(-50%);
-                display: none; gap: 4px;
-                padding: 6px 8px;
-                background: rgba(255,255,255,0.9);
-                backdrop-filter: blur(12px);
-                border-radius: 12px;
-                border: 1px solid rgba(0,0,0,0.06);
-                box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-                z-index: 1000;
-            }
-            #sketch-palette.open { display: flex; }
-            #sketch-palette .toolbar-btn { width: 34px; height: 34px; font-size: 15px; }
-
-            #focus-overlay {
-                position: fixed; top: 0; left: 0;
-                width: 100%; height: 100%;
-                background: rgba(247,246,243,0.88);
-                z-index: 50;
-                pointer-events: none;
-                opacity: 0;
-                transition: opacity 0.3s;
-            }
-            #focus-overlay.active { opacity: 1; }
-            .canvas-card.focus-highlight { z-index: 60; }
-
-            #triage {
-                position: fixed; inset: 0;
-                background: rgba(247,246,243,0.96);
-                backdrop-filter: blur(6px);
-                z-index: 1500;
-                display: none;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                gap: 28px;
-            }
-            #triage.open { display: flex; }
-            #triage .triage-label {
-                font-size: 11px; letter-spacing: 1.5px;
-                text-transform: uppercase; color: #999;
-            }
-            #triage .triage-card {
-                min-width: 260px; max-width: 420px;
-                padding: 28px 32px;
-                border-radius: 10px;
-                font-family: 'Caveat', cursive;
-                font-size: 26px; line-height: 1.35;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.12);
-                text-align: center;
-            }
-            #triage .triage-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-            .triage-btn {
-                border: 1.5px solid rgba(26,26,26,0.2);
-                background: rgba(255,255,255,0.8);
-                padding: 12px 22px;
-                border-radius: 12px;
-                font-family: 'Space Grotesk', sans-serif;
-                font-size: 13px; font-weight: 500;
-                cursor: pointer;
-                transition: background 0.15s, transform 0.1s;
-            }
-            .triage-btn:hover { background: #1A1A1A; color: #fff; transform: translateY(-2px); }
-            .triage-btn.quiet { border-style: dashed; color: #888; }
-            #triage .triage-progress { font-size: 11px; color: #aaa; }
-
-            #day-planner {
-                position: fixed; right: -320px; top: 0;
-                width: 320px; height: 100vh;
-                background: rgba(255,255,255,0.95);
-                backdrop-filter: blur(12px);
-                border-left: 1px solid rgba(0,0,0,0.06);
-                z-index: 500;
-                overflow-y: auto;
-                padding: 24px 16px 80px;
-                transition: right 0.3s ease;
-            }
-            #day-planner.open { right: 0; }
-            #day-planner h3 {
-                font-size: 12px; text-transform: uppercase;
-                letter-spacing: 1.5px; color: #999;
-                margin-bottom: 4px;
-            }
-            #day-planner .planner-hint { font-size: 11px; color: #bbb; margin-bottom: 18px; }
-            .time-slot {
-                padding: 12px;
-                margin-bottom: 10px;
-                border: 1.5px dashed rgba(0,0,0,0.08);
-                border-radius: 10px;
-                min-height: 56px;
-                transition: background 0.15s, border-color 0.15s;
-            }
-            .time-slot .slot-title {
-                font-size: 11px; font-weight: 600;
-                letter-spacing: 1px; text-transform: uppercase;
-                color: #888;
-            }
-            .time-slot.slot-top3 { background: #FFF9DD; border-color: rgba(0,0,0,0.12); }
-            .time-slot.drag-over { background: rgba(26,26,26,0.04); border-color: rgba(26,26,26,0.3); }
-            .time-slot .slot-card {
-                font-family: 'Caveat', cursive;
-                font-size: 17px; color: #1A1A1A;
-                margin-top: 6px;
-                display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-            }
-            .time-slot .slot-card button {
-                border: none; background: none; cursor: pointer;
-                color: #bbb; font-size: 11px;
-            }
-            .time-slot .slot-card button:hover { color: #1A1A1A; }
-
-            #trash-tray {
-                position: fixed; bottom: 24px; left: 20px;
-                z-index: 900;
-            }
-            #trash-toggle {
-                border: 1px solid rgba(0,0,0,0.08);
-                background: rgba(255,255,255,0.85);
-                backdrop-filter: blur(8px);
-                border-radius: 12px;
-                padding: 8px 14px;
-                font-family: 'Space Grotesk', sans-serif;
-                font-size: 11px; color: #888;
-                cursor: pointer;
-            }
-            #trash-toggle:hover { color: #1A1A1A; }
-            #trash-list {
-                display: none;
-                position: absolute; bottom: 44px; left: 0;
-                width: 240px; max-height: 280px; overflow-y: auto;
-                background: rgba(255,255,255,0.97);
-                border: 1px solid rgba(0,0,0,0.08);
-                border-radius: 12px;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-                padding: 10px;
-            }
-            #trash-list.open { display: block; }
-            .trash-item {
-                display: flex; justify-content: space-between; gap: 8px;
-                align-items: baseline;
-                padding: 7px 6px;
-                border-bottom: 1px solid rgba(0,0,0,0.04);
-                font-family: 'Caveat', cursive; font-size: 16px;
-            }
-            .trash-item button {
-                border: none; background: none; cursor: pointer;
-                font-family: 'Space Grotesk', sans-serif;
-                font-size: 10px; color: #999;
-            }
-            .trash-item button:hover { color: #1A1A1A; }
-            .trash-empty { font-size: 11px; color: #bbb; padding: 8px; }
-
-            #disclaimer-bar {
-                position: fixed; bottom: 24px; right: 20px;
-                padding: 8px 14px;
-                background: rgba(255,255,255,0.85);
-                backdrop-filter: blur(8px);
-                border: 1px solid rgba(0,0,0,0.08);
-                color: #999;
-                font-size: 10px;
-                border-radius: 12px;
-                z-index: 900;
-                max-width: 220px;
-            }
-            #disclaimer-bar button {
-                background: none; border: none;
-                color: #bbb; cursor: pointer;
-                margin-left: 8px; font-size: 10px;
-            }
-            #disclaimer-bar button:hover { color: #1A1A1A; }
-
-            @keyframes plop {
-                0% { transform: scale(0.3); opacity: 0; }
-                60% { transform: scale(1.08); opacity: 1; }
-                100% { transform: scale(1); opacity: 1; }
-            }
-            .card-plop { animation: plop 0.25s ease-out; }
-
-            @keyframes spark {
-                0% { transform: scale(0.4) rotate(0deg); opacity: 1; }
-                100% { transform: scale(1.8) rotate(40deg); opacity: 0; }
-            }
-            .done-spark {
-                position: absolute;
-                font-size: 26px;
-                pointer-events: none;
-                z-index: 200;
-                animation: spark 0.6s ease-out forwards;
-            }
-
-            .canvas-card.dimmed { opacity: 0.12; pointer-events: none; }
-
-            #undo-toast {
-                position: fixed; bottom: 84px; left: 50%;
-                transform: translateX(-50%);
-                background: #1A1A1A; color: #fff;
-                padding: 8px 16px; border-radius: 8px;
-                font-size: 12px; z-index: 2000;
-                opacity: 0; transition: opacity 0.2s;
-                pointer-events: none;
-            }
-            #undo-toast.show { opacity: 1; }
-
-            @media (prefers-reduced-motion: reduce) {
-                .card-plop, .done-spark { animation: none; }
-                #day-planner, #focus-overlay { transition: none; }
-            }
-
-            @media (max-width: 768px) {
-                #canvas-toolbar { bottom: 12px; padding: 6px 8px; }
-                .toolbar-btn { width: 36px; height: 36px; font-size: 16px; }
-                .canvas-card { min-width: 140px; max-width: 220px; font-size: 17px; }
-                #day-planner { width: 280px; }
-                #disclaimer-bar { display: none; }
-            }
-        </style>
+        <link rel="stylesheet" href="/k/js/pages/ithinkthereforiam/ithinkthereforiam.css">
 
         <div id="app-title">
             <div class="cogito">I think, therefore I am</div>
@@ -570,6 +99,29 @@ export default function IThinkThereforeIAm() {
         <div id="trash-tray">
             <button id="trash-toggle">things I let go &middot; <span id="trash-count">0</span></button>
             <div id="trash-list"></div>
+        </div>
+
+        <div id="settings-panel">
+            <button id="settings-toggle">&#9881;</button>
+            <div id="settings-dropdown">
+                <div class="settings-section">
+                    <div class="settings-label">Theme</div>
+                    <div class="settings-row">
+                        <button class="settings-chip" data-theme="light">Light</button>
+                        <button class="settings-chip" data-theme="dark">Dark</button>
+                        <button class="settings-chip" data-theme="auto">Auto</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-label">Card font</div>
+                    <div class="settings-row">
+                        <button class="settings-chip" data-font="caveat" style="font-family:'Caveat',cursive">Handwritten</button>
+                        <button class="settings-chip" data-font="grotesk" style="font-family:'Space Grotesk',sans-serif">Clean</button>
+                        <button class="settings-chip" data-font="inter" style="font-family:'Inter',sans-serif">Inter</button>
+                        <button class="settings-chip" data-font="baskerville" style="font-family:'Libre Baskerville',serif">Serif</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="disclaimer-bar">
@@ -661,6 +213,66 @@ function initCanvas() {
         redrawSketch(ctx);
     }
 
+    // --- Settings: theme + font ---
+    function loadSettings() {
+        try {
+            return JSON.parse(localStorage.getItem('ithink_settings') || '{}');
+        } catch { return {}; }
+    }
+
+    function saveSettings(settings) {
+        localStorage.setItem('ithink_settings', JSON.stringify(settings));
+    }
+
+    function applySettings(settings) {
+        // Theme
+        root.classList.remove('theme-dark');
+        const theme = settings.theme || 'light';
+        if (theme === 'dark' || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            root.classList.add('theme-dark');
+        }
+        // Font
+        root.classList.remove('font-inter', 'font-baskerville', 'font-grotesk');
+        const font = settings.font || 'caveat';
+        if (font !== 'caveat') root.classList.add('font-' + font);
+
+        // Update chips
+        document.querySelectorAll('[data-theme]').forEach(el =>
+            el.classList.toggle('active', el.dataset.theme === (settings.theme || 'light')));
+        document.querySelectorAll('[data-font]').forEach(el =>
+            el.classList.toggle('active', el.dataset.font === (settings.font || 'caveat')));
+    }
+
+    const settings = loadSettings();
+    applySettings(settings);
+
+    // Listen for OS dark mode changes when set to auto
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        const s = loadSettings();
+        if (s.theme === 'auto') applySettings(s);
+    });
+
+    document.getElementById('settings-toggle').addEventListener('click', () => {
+        document.getElementById('settings-dropdown').classList.toggle('open');
+    });
+
+    document.getElementById('settings-dropdown').addEventListener('click', (e) => {
+        const chip = e.target.closest('.settings-chip');
+        if (!chip) return;
+        const s = loadSettings();
+        if (chip.dataset.theme) s.theme = chip.dataset.theme;
+        if (chip.dataset.font) s.font = chip.dataset.font;
+        saveSettings(s);
+        applySettings(s);
+    });
+
+    // Close settings when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#settings-panel')) {
+            document.getElementById('settings-dropdown').classList.remove('open');
+        }
+    });
+
     // ============ EVENTS ============
 
     root.addEventListener('mousedown', (e) => {
@@ -668,7 +280,7 @@ function initCanvas() {
         if (e.target.closest('.canvas-card') || e.target.closest('#canvas-toolbar') ||
             e.target.closest('#day-planner') || e.target.closest('#disclaimer-bar') ||
             e.target.closest('#trash-tray') || e.target.closest('#sketch-palette') ||
-            e.target.closest('#triage')) return;
+            e.target.closest('#triage') || e.target.closest('#settings-panel')) return;
 
         if (e.detail === 2) {
             const pos = screenToCanvas(ctx, e.clientX, e.clientY);
@@ -819,6 +431,8 @@ function initCanvas() {
         if (e.target.classList.contains('card-text')) {
             const card = ctx.state.cards.find(c => c.id === e.target.dataset.cardId);
             if (card) {
+                const cardEl = e.target.closest('.canvas-card');
+                if (cardEl) cardEl.classList.add('editing');
                 e.target.textContent = card.text;
                 placeCaretEnd(e.target);
             }
@@ -829,6 +443,8 @@ function initCanvas() {
         if (e.target.classList.contains('card-text')) {
             const card = ctx.state.cards.find(c => c.id === e.target.dataset.cardId);
             if (card) {
+                const cardEl = e.target.closest('.canvas-card');
+                if (cardEl) cardEl.classList.remove('editing');
                 card.text = e.target.innerText.replace(/\n$/, '');
                 renderCards(ctx);
                 saveState(ctx);
@@ -838,8 +454,14 @@ function initCanvas() {
 
     surface.addEventListener('keydown', (e) => {
         if (e.target.classList.contains('card-text')) {
+            // Shift+Enter for newline, plain Enter to save
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.target.blur(); }
             if (e.key === 'Escape') { e.preventDefault(); e.target.blur(); }
+            // Tab inserts a checklist item
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                document.execCommand('insertText', false, '\n- [ ] ');
+            }
             e.stopPropagation();
         }
     });
