@@ -68,6 +68,10 @@ export default function Home() {
                 <a href="/ithinkthereforiam" data-link>I Think Therefore I Am</a>
                 <div class="link-desc">an infinite thought canvas</div>
             </div>
+            <div class="hero-link-item">
+                <a href="/articles" data-link>Writings</a>
+                <div class="link-desc">articles on AI, media & cinema</div>
+            </div>
         </div>
         
     </div>
