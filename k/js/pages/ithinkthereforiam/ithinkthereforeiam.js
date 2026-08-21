@@ -5,10 +5,11 @@ import { blankState, loadState, saveState, saveStateDebounced, pushUndo, undoSta
 import { applyViewport, screenToCanvas, resizeSketch } from './lib/viewport.js';
 import { createCard, softDelete, restoreCard, renderCards, renderTrash } from './lib/cards.js';
 import { renderKanbanBoard, updateKanbanCounts, columnAtCanvasPoint, stackPositionFor, toggleBoard, assignColumn } from './lib/kanban.js';
-import { initSketchState, setSketchTool, toggleSketchPalette, drawStroke, redrawSketch, eraseAt, onSketchMouseDown, onSketchMouseMove, onSketchMouseUp } from './lib/sketch.js';
+import { initSketchState, setSketchTool, toggleSketchPalette, drawStroke, redrawSketch, eraseAt, onSketchMouseDown, onSketchMouseMove, onSketchMouseUp, onSketchDblClick, deleteSelectedStroke } from './lib/sketch.js';
 import { openTriage, closeTriage, triageAction } from './lib/triage.js';
 import { renderDayPlanner, slotAtScreenPoint } from './lib/planner.js';
 import { enterFocus, exitFocus } from './lib/focus.js';
+import { renderThreads, setTempThread, hasThread } from './lib/threads.js';
 
 let _cleanup = null;
 
@@ -55,9 +56,12 @@ export default function IThinkThereforeIAm() {
         </div>
 
         <div id="sketch-palette">
+            <button class="toolbar-btn" data-tool="select"><span>&#8598;</span><span class="tooltip">Select &middot; drag to move &middot; double-click for label</span></button>
             <button class="toolbar-btn" data-tool="pen"><span>&#9998;</span><span class="tooltip">Pen</span></button>
+            <button class="toolbar-btn" data-tool="line"><span>&#9585;</span><span class="tooltip">Line</span></button>
             <button class="toolbar-btn" data-tool="arrow"><span>&#8599;</span><span class="tooltip">Arrow</span></button>
             <button class="toolbar-btn" data-tool="rect"><span>&#9645;</span><span class="tooltip">Box</span></button>
+            <button class="toolbar-btn" data-tool="tri"><span>&#9651;</span><span class="tooltip">Triangle</span></button>
             <button class="toolbar-btn" data-tool="eraser"><span>&#9676;</span><span class="tooltip">Eraser</span></button>
         </div>
 
@@ -171,6 +175,9 @@ function initCanvas() {
     let dragOffset = { x: 0, y: 0 };
     let dragMoved = false;
     let dragGhost = null;
+    let linkingFrom = null;                       // card id a thread is being pulled from
+    let copiedCard = null;                        // internal clipboard for card clones
+    let lastMouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
     // --- Convenience wrappers ---
     function doRenderAll() {
@@ -281,7 +288,8 @@ function initCanvas() {
         if (e.target.closest('.canvas-card') || e.target.closest('#canvas-toolbar') ||
             e.target.closest('#day-planner') || e.target.closest('#disclaimer-bar') ||
             e.target.closest('#trash-tray') || e.target.closest('#sketch-palette') ||
-            e.target.closest('#triage') || e.target.closest('#settings-panel')) return;
+            e.target.closest('#triage') || e.target.closest('#settings-panel') ||
+            e.target.closest('.thread-hit')) return;
 
         if (e.detail === 2) {
             const pos = screenToCanvas(ctx, e.clientX, e.clientY);
@@ -298,6 +306,17 @@ function initCanvas() {
     });
 
     root.addEventListener('mousemove', (e) => {
+        lastMouse = { x: e.clientX, y: e.clientY };
+
+        if (linkingFrom) {
+            const pos = screenToCanvas(ctx, e.clientX, e.clientY);
+            setTempThread(ctx, linkingFrom, pos);
+            const over = e.target.closest('.canvas-card');
+            surface.querySelectorAll('.canvas-card.thread-target').forEach(c => c.classList.remove('thread-target'));
+            if (over && over.dataset.id !== linkingFrom) over.classList.add('thread-target');
+            return;
+        }
+
         if (isPanning) {
             ctx.viewport.x = e.clientX - panStart.x;
             ctx.viewport.y = e.clientY - panStart.y;
@@ -320,6 +339,10 @@ function initCanvas() {
                     dragGhost.style.left = (e.clientX - dragOffset.x * ctx.viewport.zoom) + 'px';
                     dragGhost.style.top = (e.clientY - dragOffset.y * ctx.viewport.zoom) + 'px';
                 }
+                // Threads follow the moving card
+                if ((ctx.state.threads || []).some(t => t.from === dragCard || t.to === dragCard)) {
+                    renderThreads(ctx);
+                }
 
                 const col = columnAtCanvasPoint(ctx, card.x + 90, card.y + 30);
                 kanbanBoard.querySelectorAll('.kb-col').forEach(c =>
@@ -333,6 +356,22 @@ function initCanvas() {
     });
 
     root.addEventListener('mouseup', (e) => {
+        if (linkingFrom) {
+            const over = e.target.closest('.canvas-card');
+            const targetId = over ? over.dataset.id : null;
+            if (targetId && targetId !== linkingFrom && !hasThread(ctx, linkingFrom, targetId)) {
+                pushUndo(ctx);
+                ctx.state.threads.push({ id: uid(), from: linkingFrom, to: targetId });
+                saveState(ctx);
+                showToast('threaded');
+            }
+            setTempThread(ctx, null, null);
+            surface.querySelectorAll('.canvas-card.thread-target').forEach(c => c.classList.remove('thread-target'));
+            linkingFrom = null;
+            renderThreads(ctx);
+            return;
+        }
+
         if (isPanning) {
             isPanning = false;
             root.classList.remove('grabbing');
@@ -395,6 +434,13 @@ function initCanvas() {
             return;
         }
 
+        // Pull a thread from the card's spool
+        if (e.target.classList.contains('card-thread-handle')) {
+            e.preventDefault();
+            linkingFrom = e.target.dataset.threadFrom;
+            return;
+        }
+
         if (e.target.classList.contains('card-color-dot')) {
             pushUndo(ctx);
             const card = ctx.state.cards.find(c => c.id === e.target.dataset.card);
@@ -449,6 +495,17 @@ function initCanvas() {
         }
     });
 
+    // Click a thread to cut it
+    surface.addEventListener('click', (e) => {
+        if (e.target.classList && e.target.classList.contains('thread-hit')) {
+            pushUndo(ctx);
+            ctx.state.threads = (ctx.state.threads || []).filter(t => t.id !== e.target.dataset.id);
+            renderThreads(ctx);
+            saveState(ctx);
+            showToast('thread cut');
+        }
+    });
+
     surface.addEventListener('focusin', (e) => {
         if (e.target.classList.contains('card-text')) {
             const card = ctx.state.cards.find(c => c.id === e.target.dataset.cardId);
@@ -492,6 +549,7 @@ function initCanvas() {
     ctx.dom.sketchCanvas.addEventListener('mousedown', (e) => onSketchMouseDown(ctx, e));
     ctx.dom.sketchCanvas.addEventListener('mousemove', (e) => onSketchMouseMove(ctx, e));
     ctx.dom.sketchCanvas.addEventListener('mouseup', (e) => onSketchMouseUp(ctx, e));
+    ctx.dom.sketchCanvas.addEventListener('dblclick', (e) => onSketchDblClick(ctx, e));
 
     // Toolbar
     document.getElementById('canvas-toolbar').addEventListener('click', (e) => {
@@ -578,6 +636,15 @@ function initCanvas() {
             doUndo();
             return;
         }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && ctx.selectedCardId) {
+            const card = ctx.state.cards.find(c => c.id === ctx.selectedCardId);
+            if (card) {
+                copiedCard = { ...card };
+                if (navigator.clipboard?.writeText) navigator.clipboard.writeText(card.text || '').catch(() => {});
+                showToast('thought copied');
+            }
+            return;
+        }
         if (e.ctrlKey || e.metaKey || e.altKey) return;
 
         if (e.key === 'Escape') {
@@ -602,6 +669,10 @@ function initCanvas() {
             createCard(ctx, pos.x - 90, pos.y - 30);
             return;
         }
+        if ((e.key === 'Delete' || e.key === 'Backspace') && ctx.sketch.selectedId) {
+            deleteSelectedStroke(ctx);
+            return;
+        }
         if ((e.key === 'Delete' || e.key === 'Backspace') && ctx.selectedCardId) {
             softDelete(ctx, ctx.selectedCardId);
             return;
@@ -614,6 +685,39 @@ function initCanvas() {
         }
     }
     document.addEventListener('keydown', onKeyDown);
+
+    // Paste: a copied card comes back as a clone; any plain text becomes a new thought
+    function onPaste(e) {
+        const editing = e.target.isContentEditable || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+        if (editing) return;
+        const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+        e.preventDefault();
+        const pos = screenToCanvas(ctx, lastMouse.x, lastMouse.y);
+
+        if (copiedCard && (!text || text === (copiedCard.text || ''))) {
+            pushUndo(ctx);
+            const clone = {
+                ...copiedCard,
+                id: uid(),
+                x: pos.x - 90, y: pos.y - 30,
+                column: null, timeSlot: null,
+                created: Date.now(),
+            };
+            ctx.state.cards.push(clone);
+            renderCards(ctx);
+            saveState(ctx);
+            const el = surface.querySelector(`.canvas-card[data-id="${clone.id}"]`);
+            if (el) {
+                el.classList.add('card-plop');
+                el.addEventListener('animationend', () => el.classList.remove('card-plop'), { once: true });
+            }
+            showToast('thought pasted');
+        } else if (text.trim()) {
+            createCard(ctx, pos.x - 90, pos.y - 30, text.trim());
+            showToast('thought pasted');
+        }
+    }
+    document.addEventListener('paste', onPaste);
 
     // Touch support
     let touchStartDist = 0;
@@ -675,6 +779,7 @@ function initCanvas() {
     return () => {
         window.removeEventListener('resize', onResize);
         document.removeEventListener('keydown', onKeyDown);
+        document.removeEventListener('paste', onPaste);
         clearTimeout(ctx.saveTimer);
     };
 }

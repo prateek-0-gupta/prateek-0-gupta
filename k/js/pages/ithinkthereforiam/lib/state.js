@@ -2,7 +2,7 @@
 
 export function blankState() {
     return {
-        cards: [], strokes: [], trash: [],
+        cards: [], strokes: [], trash: [], threads: [],
         viewport: { x: 0, y: 0, zoom: 1 },
         boardVisible: false,
         boardOrigin: { x: 120, y: 120 },

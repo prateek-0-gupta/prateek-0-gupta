@@ -3,8 +3,6 @@ import Home from './pages/home.js';
 import Test from './pages/test.js';
 import P2PChat from './pages/projects/p2pchat/p2pchat.js';
 import Snake from './pages/projects/snake/snake.js';
-import Baoli from './pages/projects/baoli/baoli.js';
-import KettleIndex from './pages/projects/kettleindex/kettleindex.js';
 import BVHViewer from './pages/projects/bvhviewer/bvhviewer.js';
 import IThinkThereforeIAm from './pages/ithinkthereforiam/ithinkthereforeiam.js';
 import { ArticlesIndex, Article } from './pages/articles/articles.js';
@@ -16,8 +14,6 @@ const routes = {
     '/test': Test,
     '/p2pchat': P2PChat,
     '/snake': Snake,
-    '/baoli': Baoli,
-    '/kettleindex': KettleIndex,
     '/bvhviewer': BVHViewer,
     '/ithinkthereforeiam': IThinkThereforeIAm,
     '/ithinkthereforiam': IThinkThereforeIAm,

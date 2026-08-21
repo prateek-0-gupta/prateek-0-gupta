@@ -1,224 +1,94 @@
 import { useEffect } from '../framework.js';
-import { Footer } from '../components/Footer.js';
-import { POSTERS } from '../poster-manifest.js';
+import { ARTICLES } from './articles/articles-data.js';
 
 let _jigsawCleanup = null;
+
+const PROJECTS = [
+    { title: 'Nagmani',               desc: 'an Indian gothic snake game',              href: '/snake',                        tag: 'game' },
+    { title: 'Digital Human',         desc: 'three.js based AI-driven Digital Human',   href: 'https://avatar.sumvivas.com',   tag: 'ai', external: true },
+    { title: 'Digital Doppelgänger',  desc: 'a short film',                             href: 'https://youtu.be/xPZ85jpZTsw',  tag: 'film', external: true },
+    { title: 'p2p chat',              desc: 'a serverless p2p chat',                    href: '/p2pchat',                      tag: 'web' },
+    { title: 'BVH Viewer',            desc: 'a BVH motion-capture file viewer',         href: '/bvhviewer',                    tag: '3d tool' },
+    { title: 'I Think Therefore I Am', desc: 'an infinite thought canvas',              href: '/ithinkthereforiam',            tag: 'tool' }
+];
+
+const SOCIALS = `
+    <a href="https://www.instagram.com/chai.and.photoshop" target="_blank" rel="noopener">Instagram</a>
+    <a href="https://www.linkedin.com/in/prateek-gupta08" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="mailto:prateekgupta1198@gmail.com">E-mail</a>
+`;
+
+function indexRow(item, i) {
+    const num = String(i + 1).padStart(2, '0');
+    const linkAttrs = item.external
+        ? `href="${item.href}" target="_blank" rel="noopener"`
+        : `href="${item.href}" data-link`;
+    return `
+        <a class="ix-row" ${linkAttrs}>
+            <span class="ix-num">${num}</span>
+            <span class="ix-line">
+                <span class="ix-title">${item.title}</span>
+                <span class="ix-desc">${item.desc}</span>
+            </span>
+            <span class="ix-tag">${item.tag}${item.external ? ' ↗' : ''}</span>
+        </a>`;
+}
 
 export default function Home() {
 
     useEffect(() => {
         if (_jigsawCleanup) { _jigsawCleanup(); _jigsawCleanup = null; }
         _jigsawCleanup = initJigsawTypography();
-        initBentoGrid();
     }, []);
 
-    return `
+    const writings = ARTICLES.map(a => ({
+        title: a.title,
+        desc: a.blurb,
+        href: `/articles/${a.slug}`,
+        tag: 'writing',
+    }));
 
-    <div class="hero-page">
-        <div class="hero-social-row">
-            <a href="https://www.instagram.com/chai.and.photoshop" target="_blank">Instagram</a>
-            <a href="https://www.linkedin.com/in/prateek-gupta08" target="_blank">linkedin</a>
-            <a href="mailto:prateekgupta1198@gmail.com">e-mail</a>
-        </div>
-        <div class="hero-intro">
-            <div class="hero-greeting">
-                <span class="text-part">Hi, I am</span>
+    const projectRows = PROJECTS.map(indexRow).join('');
+    const writingRows = writings.map((w, i) => indexRow(w, PROJECTS.length + i)).join('');
+
+    return `
+    <div class="index-page">
+
+        <header class="ix-top">
+            <span>prat.ee/k — Manchester, UK</span>
+        </header>
+
+        <main class="ix-main">
+            <section class="ix-intro">
+                <span class="ix-hi">Hi, I am</span>
                 <div class="jigsaw-inline">
                     <canvas id="typeCanvas"></canvas>
                 </div>
-            </div>
-            <div class="hero-subtitle">i am a software engineer and a creative future media practitioner</div>
-            <div class="hero-meta">
-                <span>I am based in Manchester, UK</span>
-                <span class="dot">-</span>
-                <span> and I work at Sum Vivas Ltd</span>
-            </div>
-        </div>
-         <div class="hero-links-card">
-            <h3></h3>
-            <div class="hero-link-item">
-                <a href="/snake" data-link>Nagmani</a>
-                <div class="link-desc">an Indian gothic snake game</div>
-            </div>
-            <div class="hero-link-item">
-                <a href="/baoli" data-link>Baoli</a>
-                <div class="link-desc">a three js based experience</div>
-            </div>
-            <div class="hero-link-item">
-                <a href="/kettleindex" data-link>Kettle Index</a>
-                <div class="link-desc">token energy & carbon calculator</div>
-            </div>
-            <div class="hero-link-item">
-                <a href="https://avatar.sumvivas.com" target="_blank">Digital Human</a>
-                <div class="link-desc">three.js based AI-driven Digital Human </div>
-            </div>
-            <div class="hero-link-item">
-                <a href="https://youtu.be/xPZ85jpZTsw" target="_blank">Digital Doppelgänger</a>
-                <div class="link-desc">A Short Film</div>
-            </div>
-            <div class="hero-link-item">
-                <a href="/p2pchat" data-link>p2p chat</a>
-                <div class="link-desc">a serverless p2p chat</div>
-            </div>
-            <div class="hero-link-item">
-                <a href="/bvhviewer" data-link>BVH Viewer</a>
-                <div class="link-desc">a BVH file viewer</div>
-            </div>
-            <div class="hero-link-item">
-                <a href="/ithinkthereforiam" data-link>I Think Therefore I Am</a>
-                <div class="link-desc">an infinite thought canvas</div>
-            </div>
-            <div class="hero-link-item">
-                <a href="/articles" data-link>Writings</a>
-                <div class="link-desc">articles on AI, media & cinema</div>
-            </div>
-        </div>
-        
-    </div>
+                <p class="ix-role">
+                    software engineer &amp; creative future media practitioner </br></br>
+                    AI &amp; Development at Sum Vivas.
+                </p>
+                <div class="ix-social">${SOCIALS}</div>
+            </section>
 
-    
+            <section class="ix-list">
+                ${projectRows}
+                <div class="ix-gap"></div>
+                ${writingRows}
+            </section>
+        </main>
+
+        <footer class="ix-foot">
+            <span>© 2026 Prateek Kumar Gupta</span>
+            <span class="ix-note">“The best way out is always through.” — Robert Frost</span>
+        </footer>
+
+    </div>
     `;
 }
 
 
-const BENTO_ITEMS = [
-  
-    {
-        type: 'video',
-        title: 'Digital Doppelgänger',
-        videoId: 'xPZ85jpZTsw',
-    },
-    ...POSTERS.map(p => ({
-        type: 'image',
-        src: `js/pages/projects/posters/assets/${p.file}`,
-        title: p.title || p.file,
-    })),
-];
 
-const SPAN_POOLS = {
-    project:  [ [4,2],[4,2],[4,3],[6,2],[3,2],[3,3] ],
-    video:    [ [6,2],[6,3],[4,2],[4,3] ],
-    image:    [ [3,2],[3,3],[4,2],[2,2],[2,3],[4,3],[5,2],[6,3] ],
-    label:    [ [3,1],[2,1],[3,2],[2,2],[4,1] ],
-    stat:     [ [2,1],[2,2],[3,1] ],
-};
-
-function bentoSpan(item) {
-    const pool = SPAN_POOLS[item.type] || [[3,2]];
-    return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function renderBentoCell(item) {
-    switch (item.type) {
-        case 'project': {
-            const tag = item.internal ? 'project' : 'external';
-            const arrow = item.internal ? '↗' : '↗';
-            return `
-                <a class="bento-cell bento-project"
-                   style="background:${item.bg};"
-                   ${item.internal ? `href="${item.href}" data-link` : `href="${item.href}" target="_blank" rel="noopener"`}>
-                    <span class="bc-arrow">${arrow}</span>
-                    <span class="bc-tag">${tag}</span>
-                    <div class="bc-title">${item.title}</div>
-                    <div class="bc-desc">${item.desc}</div>
-                </a>`;
-        }
-        case 'image': {
-            return `
-                <div class="bento-cell bento-image">
-                    <img data-src="${item.src}" alt="${item.title}"
-                         onerror="this.closest('.bento-cell').style.display='none'">
-                    <div class="bc-img-overlay"><span>${item.title}</span></div>
-                </div>`;
-        }
-        case 'video': {
-            return `
-                <div class="bento-cell bento-video">
-                    <iframe
-                        src="https://www.youtube.com/embed/${item.videoId}?rel=0&modestbranding=1"
-                        title="${item.title}"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowfullscreen
-                        loading="lazy">
-                    </iframe>
-                </div>`;
-        }
-        case 'label': {
-            const lines = item.main.split('\n').join('<br>');
-            return `
-                <div class="bento-cell bento-label" style="background:${item.bg};">
-                    <div class="bc-lbl-main">${lines}</div>
-                    <div class="bc-lbl-sub">${item.sub}</div>
-                </div>`;
-        }
-        case 'stat': {
-            return `
-                <div class="bento-cell bento-stat" style="background:${item.bg};">
-                    <div class="bc-stat-num">${item.num}</div>
-                    <div class="bc-stat-label">${item.label}</div>
-                </div>`;
-        }
-        default: return '';
-    }
-}
-
-function initBentoGrid() {
-    const grid    = document.getElementById('bento-grid');
-    const masonry = document.getElementById('image-masonry');
-    if (!grid || !masonry) return;
-
-    // Shuffle all items
-    const all = [...BENTO_ITEMS];
-    for (let i = all.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [all[i], all[j]] = [all[j], all[i]];
-    }
-
-    const primaryItems = all.filter(it => it.type !== 'image');
-    const imageItems   = all.filter(it => it.type === 'image');
-
-    // ── Primary bento grid (projects, videos, labels, stats) ────────────
-    const fragGrid = document.createDocumentFragment();
-    const wrapper  = document.createElement('div');
-    primaryItems.forEach(item => {
-        const [cs, rs] = bentoSpan(item);
-        const html = renderBentoCell(item);
-        wrapper.innerHTML = html.trim();
-        const el = wrapper.firstChild;
-        if (!el) return;
-        el.style.gridColumn = `span ${cs}`;
-        el.style.gridRow    = `span ${rs}`;
-        fragGrid.appendChild(el);
-    });
-    grid.innerHTML = '';
-    grid.appendChild(fragGrid);
-
-    // ── Image masonry (CSS columns — natural aspect ratio, no gaps) ──────
-    const fragMasonry = document.createDocumentFragment();
-    imageItems.forEach(item => {
-        const html = renderBentoCell(item);
-        wrapper.innerHTML = html.trim();
-        const el = wrapper.firstChild;
-        if (!el) return;
-        fragMasonry.appendChild(el);
-    });
-    masonry.innerHTML = '';
-    masonry.appendChild(fragMasonry);
-
-    // ── Lazy load via IntersectionObserver ───────────────────────────────
-    const lazyObs = new IntersectionObserver((entries, obs) => {
-        entries.forEach(entry => {
-            if (!entry.isIntersecting) return;
-            const img = entry.target;
-            img.src = img.dataset.src;
-            img.onload  = () => img.classList.add('loaded');
-            img.onerror = () => img.closest('.bento-cell').style.display = 'none';
-            obs.unobserve(img);
-        });
-    }, { rootMargin: '200px 0px' }); // start loading 200px before entering viewport
-
-    masonry.querySelectorAll('img[data-src]').forEach(img => lazyObs.observe(img));
-}
 
 //     TYPOGRAPHY ENGINE
 
@@ -284,14 +154,12 @@ function initJigsawTypography() {
 
     let currentPalette = null;
 
+    // Ink on paper, one blue accent for the offset — constant, only the cut changes
     function randomMonoPalette() {
-        const bgL = 2 + Math.random() * 6;
-        const fgL = 82 + Math.random() * 18;
-        const shL = 18 + Math.random() * 27;
         return {
-            bg: `hsl(0, 0%, ${bgL.toFixed(1)}%)`,
-            fg: `hsl(0, 0%, ${fgL.toFixed(1)}%)`,
-            shadow: `hsl(0, 0%, ${shL.toFixed(1)}%)`
+            bg: 'transparent',
+            fg: '#1d1a16',
+            shadow: '#2842c8'
         };
     }
 

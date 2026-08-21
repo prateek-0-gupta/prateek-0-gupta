@@ -4,6 +4,7 @@ import { COLORS, COLOR_HEX, COLOR_NAMES, SLOTS, LONGFORM_AT } from './constants.
 import { uid, escapeHtml, renderMarkdown, placeCaretEnd } from './utils.js';
 import { pushUndo, saveState } from './state.js';
 import { screenToCanvas } from './viewport.js';
+import { renderThreads } from './threads.js';
 
 export function createCard(ctx, x, y, text = '') {
     pushUndo(ctx);
@@ -79,6 +80,7 @@ export function renderCards(ctx) {
         el.innerHTML = `
             ${slot ? `<div class="card-slot-badge">${slot.id === 'top3' ? 'top 3' : slot.title}</div>` : ''}
             <button class="card-delete" data-delete="${card.id}" title="let it go">&times;</button>
+            <div class="card-thread-handle" data-thread-from="${card.id}" title="pull a thread to another thought"></div>
             <div class="card-text" contenteditable="true" data-card-id="${card.id}">${renderMarkdown(card.text)}</div>
             <div class="card-color-picker">
                 ${COLORS.map(c => `<div class="card-color-dot" style="background:${COLOR_HEX[c]}" title="${COLOR_NAMES[c]}" data-color="${c}" data-card="${card.id}"></div>`).join('')}
@@ -88,6 +90,7 @@ export function renderCards(ctx) {
     });
 
     emptyHint.classList.toggle('hidden', ctx.state.cards.length > 0);
+    renderThreads(ctx);
     renderTrash(ctx);
 }
 

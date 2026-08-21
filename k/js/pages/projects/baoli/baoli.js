@@ -19,7 +19,7 @@ export default function BaoliPage() {
             if (!container) return;
 
             const { createGame } = await import('./engine.js');
-            const result = createGame(container);
+            const result = await createGame(container);
             _gameInstance = result;
             _cleanup = result.destroy;
         };
@@ -118,6 +118,15 @@ export default function BaoliPage() {
                 box-shadow: 0 0 6px rgba(255, 0, 85, 0.4);
             }
 
+            #baoli-rites {
+                position: absolute; top: 22px; left: 26px;
+                font-family: 'Cinzel', serif;
+                font-size: 0.72rem;
+                letter-spacing: 0.14em;
+                color: rgba(255, 102, 163, 0.55);
+                text-shadow: 0 0 12px rgba(255, 0, 85, 0.3);
+            }
+
             #baoli-interact-prompt {
                 position: absolute; top: 55%; left: 50%;
                 transform: translateX(-50%);
@@ -205,6 +214,7 @@ export default function BaoliPage() {
 
         <div id="baoli-hud">
             <div id="baoli-crosshair"></div>
+            <div id="baoli-rites"></div>
             <div id="baoli-interact-prompt">Click to light the Diya</div>
             <div id="baoli-narrative-text"></div>
             <div id="baoli-phase-text"></div>
@@ -217,7 +227,9 @@ export default function BaoliPage() {
 
         <div id="baoli-start-overlay">
             <h1>बावली</h1>
+            <div class="subtitle">forty names are missing from its stones · find out why</div>
             <button class="start-btn" data-action="startBaoli">Start</button>
+            <div class="warning">W A S D — walk &nbsp;·&nbsp; mouse — look &nbsp;·&nbsp; click — light diyas, ring bells</div>
         </div>
     </div>
     `;
