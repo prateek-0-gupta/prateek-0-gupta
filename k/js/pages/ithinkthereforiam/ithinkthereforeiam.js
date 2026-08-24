@@ -56,7 +56,7 @@ export default function IThinkThereforeIAm() {
         </div>
 
         <div id="sketch-palette">
-            <button class="toolbar-btn" data-tool="select"><span>&#8598;</span><span class="tooltip">Select &middot; drag to move &middot; double-click for label</span></button>
+            <button class="toolbar-btn" data-tool="select"><span>&#8598;</span><span class="tooltip">Select &middot; drag to move &middot; corners to resize &middot; double-click for label</span></button>
             <button class="toolbar-btn" data-tool="pen"><span>&#9998;</span><span class="tooltip">Pen</span></button>
             <button class="toolbar-btn" data-tool="line"><span>&#9585;</span><span class="tooltip">Line</span></button>
             <button class="toolbar-btn" data-tool="arrow"><span>&#8599;</span><span class="tooltip">Arrow</span></button>
@@ -546,11 +546,15 @@ function initCanvas() {
         }
     });
 
-    // Sketch drawing
+    // Sketch drawing. Move/up live on the window: the toolbar and palette sit over
+    // the canvas, so a drag that crosses them would otherwise stall mid-stroke and
+    // never see its mouseup.
     ctx.dom.sketchCanvas.addEventListener('mousedown', (e) => onSketchMouseDown(ctx, e));
-    ctx.dom.sketchCanvas.addEventListener('mousemove', (e) => onSketchMouseMove(ctx, e));
-    ctx.dom.sketchCanvas.addEventListener('mouseup', (e) => onSketchMouseUp(ctx, e));
     ctx.dom.sketchCanvas.addEventListener('dblclick', (e) => onSketchDblClick(ctx, e));
+    const onSketchMove = (e) => onSketchMouseMove(ctx, e);
+    const onSketchUp = (e) => onSketchMouseUp(ctx, e);
+    window.addEventListener('mousemove', onSketchMove);
+    window.addEventListener('mouseup', onSketchUp);
 
     // Toolbar
     document.getElementById('canvas-toolbar').addEventListener('click', (e) => {
@@ -779,6 +783,8 @@ function initCanvas() {
 
     return () => {
         window.removeEventListener('resize', onResize);
+        window.removeEventListener('mousemove', onSketchMove);
+        window.removeEventListener('mouseup', onSketchUp);
         document.removeEventListener('keydown', onKeyDown);
         document.removeEventListener('paste', onPaste);
         clearTimeout(ctx.saveTimer);

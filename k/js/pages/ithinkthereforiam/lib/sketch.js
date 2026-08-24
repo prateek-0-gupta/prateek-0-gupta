@@ -12,6 +12,7 @@ export function initSketchState() {
         shapeStart: null,
         selectedId: null,   // selected stroke (select tool)
         dragSel: null,      // { id, last:{x,y}, moved } while moving a stroke
+        resizeSel: null,    // { id, corner, anchor, startCorner, orig, moved } while resizing
         ink: '#1A1A1A',
     };
 }
@@ -62,8 +63,9 @@ function segDist(px, py, a, b) {
 
 export function strokeBBox(s) {
     if (s.type === 'text') {
-        const hw = 8 + (s.text || '').length * 4;
-        return { x1: s.at.x - hw, y1: s.at.y - 14, x2: s.at.x + hw, y2: s.at.y + 14 };
+        const k = (s.size || 17) / 17;
+        const hw = (8 + (s.text || '').length * 4) * k;
+        return { x1: s.at.x - hw, y1: s.at.y - 14 * k, x2: s.at.x + hw, y2: s.at.y + 14 * k };
     }
     let xs = [], ys = [];
     if (s.type === 'pen') { xs = s.points.map(p => p.x); ys = s.points.map(p => p.y); }
@@ -117,6 +119,11 @@ function strokeHit(s, wx, wy, r, fill = false) {
     return false;
 }
 
+// Never match on a falsy id: that would resolve to the first id-less stroke.
+function strokeById(ctx, id) {
+    return id ? (ctx.state.strokes || []).find(s => s.id === id) || null : null;
+}
+
 export function strokeAt(ctx, wx, wy, r = null) {
     const rad = r ?? 12 / ctx.viewport.zoom;
     const strokes = ctx.state.strokes || [];
@@ -136,6 +143,68 @@ function translateStroke(s, dx, dy) {
     if (s.type === 'pen') s.points.forEach(p => { p.x += dx; p.y += dy; });
     else if (s.type === 'text') { s.at.x += dx; s.at.y += dy; }
     else { s.from.x += dx; s.from.y += dy; s.to.x += dx; s.to.y += dy; }
+}
+
+/* ── Resize ───────────────────────────────────────────────────────── */
+
+const HALO_PAD = 8;
+
+// Screen-space corners of the selection halo; used for drawing and hit-testing.
+function resizeHandles(ctx, s) {
+    const bb = strokeBBox(s);
+    const a = w2s(ctx, { x: bb.x1, y: bb.y1 }), b = w2s(ctx, { x: bb.x2, y: bb.y2 });
+    return [
+        { x: a.x - HALO_PAD, y: a.y - HALO_PAD, corner: 'nw' },
+        { x: b.x + HALO_PAD, y: a.y - HALO_PAD, corner: 'ne' },
+        { x: a.x - HALO_PAD, y: b.y + HALO_PAD, corner: 'sw' },
+        { x: b.x + HALO_PAD, y: b.y + HALO_PAD, corner: 'se' },
+    ];
+}
+
+function handleNear(ctx, s, sx, sy) {
+    return resizeHandles(ctx, s).find(h => Math.abs(sx - h.x) < 8 && Math.abs(sy - h.y) < 8) || null;
+}
+
+function snapshotGeom(s) {
+    if (s.type === 'pen') return { points: s.points.map(p => ({ ...p })) };
+    if (s.type === 'text') return { at: { ...s.at }, size: s.size || 17 };
+    return { from: { ...s.from }, to: { ...s.to } };
+}
+
+function startResize(s, corner, pos) {
+    const bb = strokeBBox(s);
+    return {
+        id: s.id, corner,
+        // the bbox corner opposite the grabbed handle stays put
+        anchor: {
+            x: corner === 'nw' || corner === 'sw' ? bb.x2 : bb.x1,
+            y: corner === 'nw' || corner === 'ne' ? bb.y2 : bb.y1,
+        },
+        startCorner: { x: pos.x, y: pos.y },
+        orig: snapshotGeom(s),
+        moved: false,
+    };
+}
+
+function applyResize(s, rs, pos) {
+    const { anchor, startCorner, orig } = rs;
+    const dx0 = startCorner.x - anchor.x, dy0 = startCorner.y - anchor.y;
+
+    if (s.type === 'text') {
+        // uniform scale from drag distance so the font stays proportional
+        const d0 = Math.hypot(dx0, dy0);
+        let k = d0 < 1e-6 ? 1 : Math.hypot(pos.x - anchor.x, pos.y - anchor.y) / d0;
+        s.size = Math.min(200, Math.max(9, orig.size * k));
+        k = s.size / orig.size;
+        s.at = { x: anchor.x + (orig.at.x - anchor.x) * k, y: anchor.y + (orig.at.y - anchor.y) * k };
+        return;
+    }
+
+    const sx = Math.abs(dx0) < 1e-6 ? 1 : (pos.x - anchor.x) / dx0;
+    const sy = Math.abs(dy0) < 1e-6 ? 1 : (pos.y - anchor.y) / dy0;
+    const scale = p => ({ x: anchor.x + (p.x - anchor.x) * sx, y: anchor.y + (p.y - anchor.y) * sy });
+    if (s.type === 'pen') s.points = orig.points.map(scale);
+    else { s.from = scale(orig.from); s.to = scale(orig.to); }
 }
 
 /* ── Drawing ──────────────────────────────────────────────────────── */
@@ -189,22 +258,28 @@ export function drawStroke(ctx, s) {
     // label
     if (s.text) {
         const a = w2s(ctx, strokeAnchor(s));
-        sketchCtx.font = `${Math.max(11, 17 * ctx.viewport.zoom)}px Caveat, cursive`;
+        const px = (s.type === 'text' ? (s.size || 17) : 17) * ctx.viewport.zoom;
+        sketchCtx.font = `${Math.max(11, px)}px Caveat, cursive`;
         sketchCtx.textAlign = 'center';
         sketchCtx.textBaseline = 'middle';
         sketchCtx.fillStyle = ctx.sketch.ink;
         sketchCtx.fillText(s.text, a.x, a.y);
     }
 
-    // selection halo: dashed bounding box
+    // selection halo: dashed bounding box + corner resize handles
     if (selected) {
-        const bb = strokeBBox(s);
-        const a = w2s(ctx, { x: bb.x1, y: bb.y1 }), b = w2s(ctx, { x: bb.x2, y: bb.y2 });
+        const hs = resizeHandles(ctx, s);
         sketchCtx.save();
         sketchCtx.strokeStyle = 'rgba(191,64,52,0.8)';
         sketchCtx.lineWidth = 1.2;
         sketchCtx.setLineDash([5, 4]);
-        sketchCtx.strokeRect(a.x - 8, a.y - 8, (b.x - a.x) + 16, (b.y - a.y) + 16);
+        sketchCtx.strokeRect(hs[0].x, hs[0].y, hs[3].x - hs[0].x, hs[3].y - hs[0].y);
+        sketchCtx.setLineDash([]);
+        sketchCtx.fillStyle = '#fff';
+        hs.forEach(h => {
+            sketchCtx.fillRect(h.x - 3.5, h.y - 3.5, 7, 7);
+            sketchCtx.strokeRect(h.x - 3.5, h.y - 3.5, 7, 7);
+        });
         sketchCtx.restore();
     }
 }
@@ -290,7 +365,7 @@ export function openTextEditor(ctx, pos) {
     spawnTextInput(ctx, w2s(ctx, pos), '', 'write…', (v) => {
         if (!v) return;
         pushUndo(ctx);
-        ctx.state.strokes.push({ id: uid(), type: 'text', at: pos, text: v });
+        ctx.state.strokes.push({ id: uid(), type: 'text', at: pos, text: v, size: 17 });
         saveState(ctx);
     });
 }
@@ -302,6 +377,14 @@ export function onSketchMouseDown(ctx, e) {
     const pos = screenToCanvas(ctx, e.clientX, e.clientY);
 
     if (ctx.sketch.tool === 'select') {
+        // a handle on the current selection wins over picking a new stroke
+        const sel = strokeById(ctx, ctx.sketch.selectedId);
+        const h = sel ? handleNear(ctx, sel, e.clientX, e.clientY) : null;
+        if (h) {
+            pushUndo(ctx);
+            ctx.sketch.resizeSel = startResize(sel, h.corner, pos);
+            return;
+        }
         const s = strokeAt(ctx, pos.x, pos.y);
         ctx.sketch.selectedId = s ? s.id : null;
         if (s) {
@@ -331,8 +414,25 @@ export function onSketchMouseDown(ctx, e) {
 export function onSketchMouseMove(ctx, e) {
     const pos = screenToCanvas(ctx, e.clientX, e.clientY);
 
+    // Button released off-window: finish up rather than dragging on without it.
+    if (e.buttons === 0 && (ctx.sketch.dragSel || ctx.sketch.resizeSel || ctx.sketch.isDrawing)) {
+        onSketchMouseUp(ctx, e);
+        return;
+    }
+
+    if (ctx.sketch.tool === 'select' && ctx.sketch.resizeSel) {
+        const rs = ctx.sketch.resizeSel;
+        const s = strokeById(ctx, rs.id);
+        if (s) {
+            applyResize(s, rs, pos);
+            rs.moved = true;
+            redrawSketch(ctx);
+        }
+        return;
+    }
+
     if (ctx.sketch.tool === 'select' && ctx.sketch.dragSel) {
-        const s = ctx.state.strokes.find(x => x.id === ctx.sketch.dragSel.id);
+        const s = strokeById(ctx, ctx.sketch.dragSel.id);
         if (s) {
             translateStroke(s, pos.x - ctx.sketch.dragSel.last.x, pos.y - ctx.sketch.dragSel.last.y);
             ctx.sketch.dragSel.last = pos;
@@ -344,7 +444,11 @@ export function onSketchMouseMove(ctx, e) {
 
     // hover feedback for the select tool
     if (ctx.sketch.tool === 'select') {
-        ctx.dom.sketchCanvas.style.cursor = strokeAt(ctx, pos.x, pos.y) ? 'move' : 'default';
+        const sel = strokeById(ctx, ctx.sketch.selectedId);
+        const h = sel ? handleNear(ctx, sel, e.clientX, e.clientY) : null;
+        ctx.dom.sketchCanvas.style.cursor = h
+            ? (h.corner === 'nw' || h.corner === 'se' ? 'nwse-resize' : 'nesw-resize')
+            : (strokeAt(ctx, pos.x, pos.y) ? 'move' : 'default');
         return;
     }
 
@@ -361,6 +465,13 @@ export function onSketchMouseMove(ctx, e) {
 }
 
 export function onSketchMouseUp(ctx, e) {
+    if (ctx.sketch.tool === 'select' && ctx.sketch.resizeSel) {
+        if (ctx.sketch.resizeSel.moved) saveState(ctx);
+        else ctx.undoStack.pop();   // handle click without movement: discard the snapshot
+        ctx.sketch.resizeSel = null;
+        return;
+    }
+
     if (ctx.sketch.tool === 'select' && ctx.sketch.dragSel) {
         if (ctx.sketch.dragSel.moved) saveState(ctx);
         else ctx.undoStack.pop();   // selection click without movement: discard the snapshot
