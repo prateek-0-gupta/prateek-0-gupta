@@ -6,7 +6,7 @@ import { pushUndo, saveState, saveStateDebounced } from './state.js';
 
 export function initSketchState() {
     return {
-        tool: null,         // null | select | pen | line | arrow | rect | tri | eraser
+        tool: null,         // null | select | pen | line | arrow | rect | tri | text | eraser
         isDrawing: false,
         currentStroke: [],
         shapeStart: null,
@@ -25,6 +25,7 @@ export function setSketchTool(ctx, tool) {
         b.classList.toggle('active', b.dataset.tool === ctx.sketch.tool));
     ctx.dom.sketchCanvas.classList.toggle('active', ctx.sketch.tool !== null);
     ctx.dom.sketchCanvas.classList.toggle('tool-select', ctx.sketch.tool === 'select');
+    ctx.dom.sketchCanvas.classList.toggle('tool-text', ctx.sketch.tool === 'text');
     ctx.dom.sketchCanvas.style.cursor = '';
     document.getElementById('btn-sketch').classList.toggle('active', ctx.sketch.tool !== null);
     redrawSketch(ctx);
@@ -60,6 +61,10 @@ function segDist(px, py, a, b) {
 }
 
 export function strokeBBox(s) {
+    if (s.type === 'text') {
+        const hw = 8 + (s.text || '').length * 4;
+        return { x1: s.at.x - hw, y1: s.at.y - 14, x2: s.at.x + hw, y2: s.at.y + 14 };
+    }
     let xs = [], ys = [];
     if (s.type === 'pen') { xs = s.points.map(p => p.x); ys = s.points.map(p => p.y); }
     else { xs = [s.from.x, s.to.x]; ys = [s.from.y, s.to.y]; }
@@ -88,6 +93,10 @@ function strokeHit(s, wx, wy, r, fill = false) {
     if (s.type === 'pen') {
         return (s.points || []).some((p, i) =>
             i > 0 ? segDist(wx, wy, s.points[i - 1], p) < r : Math.hypot(p.x - wx, p.y - wy) < r);
+    }
+    if (s.type === 'text') {
+        const b = strokeBBox(s);
+        return wx > b.x1 - r && wx < b.x2 + r && wy > b.y1 - r && wy < b.y2 + r;
     }
     if (!s.from || !s.to) return false;
     if (s.type === 'arrow' || s.type === 'line') return segDist(wx, wy, s.from, s.to) < r;
@@ -125,6 +134,7 @@ export function strokeAt(ctx, wx, wy, r = null) {
 
 function translateStroke(s, dx, dy) {
     if (s.type === 'pen') s.points.forEach(p => { p.x += dx; p.y += dy; });
+    else if (s.type === 'text') { s.at.x += dx; s.at.y += dy; }
     else { s.from.x += dx; s.from.y += dy; s.to.x += dx; s.to.y += dy; }
 }
 
@@ -230,15 +240,17 @@ export function deleteSelectedStroke(ctx) {
 
 /* ── Label editing ────────────────────────────────────────────────── */
 
-export function openLabelEditor(ctx, stroke) {
-    document.querySelector('.sketch-label-input')?.remove();
-    const a = w2s(ctx, strokeAnchor(stroke));
+// Shared floating input. onCommit receives the trimmed value, or null on cancel.
+function spawnTextInput(ctx, screen, value, placeholder, onCommit) {
+    const prev = document.querySelector('.sketch-label-input');
+    if (prev) prev._commit ? prev._commit(false) : prev.remove();
+
     const input = document.createElement('input');
     input.className = 'sketch-label-input';
-    input.value = stroke.text || '';
-    input.placeholder = 'label…';
-    input.style.left = a.x + 'px';
-    input.style.top = a.y + 'px';
+    input.value = value;
+    input.placeholder = placeholder;
+    input.style.left = screen.x + 'px';
+    input.style.top = screen.y + 'px';
     ctx.dom.root.appendChild(input);
     input.focus();
     input.select();
@@ -246,22 +258,40 @@ export function openLabelEditor(ctx, stroke) {
     let done = false;
     const commit = (cancel) => {
         if (done) return; done = true;
-        if (!cancel) {
-            const v = input.value.trim();
-            if (v !== (stroke.text || '')) {
-                pushUndo(ctx);
-                if (v) stroke.text = v; else delete stroke.text;
-                saveState(ctx);
-            }
-        }
         input.remove();
+        onCommit(cancel ? null : input.value.trim());
         redrawSketch(ctx);
     };
+    input._commit = commit;
     input.addEventListener('blur', () => commit(false));
     input.addEventListener('keydown', (e) => {
         e.stopPropagation();
         if (e.key === 'Enter') commit(false);
         if (e.key === 'Escape') commit(true);
+    });
+}
+
+export function openLabelEditor(ctx, stroke) {
+    spawnTextInput(ctx, w2s(ctx, strokeAnchor(stroke)), stroke.text || '', 'label…', (v) => {
+        if (v === null || v === (stroke.text || '')) return;
+        pushUndo(ctx);
+        if (v) stroke.text = v;
+        else if (stroke.type === 'text') {
+            // a text stroke with no text is nothing at all
+            ctx.state.strokes = ctx.state.strokes.filter(s => s.id !== stroke.id);
+            if (ctx.sketch.selectedId === stroke.id) ctx.sketch.selectedId = null;
+        }
+        else delete stroke.text;
+        saveState(ctx);
+    });
+}
+
+export function openTextEditor(ctx, pos) {
+    spawnTextInput(ctx, w2s(ctx, pos), '', 'write…', (v) => {
+        if (!v) return;
+        pushUndo(ctx);
+        ctx.state.strokes.push({ id: uid(), type: 'text', at: pos, text: v });
+        saveState(ctx);
     });
 }
 
@@ -279,6 +309,12 @@ export function onSketchMouseDown(ctx, e) {
             ctx.sketch.dragSel = { id: s.id, last: pos, moved: false };
         }
         redrawSketch(ctx);
+        return;
+    }
+
+    if (ctx.sketch.tool === 'text') {
+        e.preventDefault();     // keep focus on the input we are about to spawn
+        openTextEditor(ctx, pos);
         return;
     }
 

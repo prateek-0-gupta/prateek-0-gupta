@@ -637,6 +637,7 @@ body, html { width: 100%; height: 100%; overflow: hidden; }
 /* ── Sketch: select tool + labels ─────────────────────────────────── */
 
 #sketch-canvas.active.tool-select { cursor: default; }
+#sketch-canvas.active.tool-text { cursor: text; }
 
 .sketch-label-input {
     position: fixed;

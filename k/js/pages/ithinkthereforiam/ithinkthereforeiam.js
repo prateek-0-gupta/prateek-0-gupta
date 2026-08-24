@@ -62,6 +62,7 @@ export default function IThinkThereforeIAm() {
             <button class="toolbar-btn" data-tool="arrow"><span>&#8599;</span><span class="tooltip">Arrow</span></button>
             <button class="toolbar-btn" data-tool="rect"><span>&#9645;</span><span class="tooltip">Box</span></button>
             <button class="toolbar-btn" data-tool="tri"><span>&#9651;</span><span class="tooltip">Triangle</span></button>
+            <button class="toolbar-btn" data-tool="text"><span>T</span><span class="tooltip">Text &middot; click anywhere to type</span></button>
             <button class="toolbar-btn" data-tool="eraser"><span>&#9676;</span><span class="tooltip">Eraser</span></button>
         </div>
 
