@@ -20,7 +20,14 @@ export function w2s(ctx, p) {
     };
 }
 
+// Backing store scaled to the device pixel ratio so strokes stay crisp on
+// retina screens; drawing code keeps working in CSS pixels via the transform.
 export function resizeSketch(ctx) {
-    ctx.dom.sketchCanvas.width = window.innerWidth;
-    ctx.dom.sketchCanvas.height = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const c = ctx.dom.sketchCanvas;
+    c.width = Math.round(window.innerWidth * dpr);
+    c.height = Math.round(window.innerHeight * dpr);
+    c.style.width = window.innerWidth + 'px';
+    c.style.height = window.innerHeight + 'px';
+    ctx.sketchCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }

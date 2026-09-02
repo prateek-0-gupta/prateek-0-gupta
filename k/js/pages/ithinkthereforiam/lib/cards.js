@@ -58,7 +58,18 @@ export function restoreCard(ctx, id) {
     saveState(ctx);
 }
 
+// Removing a focused card fires focusout, whose handler calls back in here.
+// The outer render already rebuilds from state (which that handler has just
+// updated), so the nested call is skipped rather than tearing down mid-loop.
+let rendering = false;
+
 export function renderCards(ctx) {
+    if (rendering) return;
+    rendering = true;
+    try { renderCardsNow(ctx); } finally { rendering = false; }
+}
+
+function renderCardsNow(ctx) {
     const { surface, emptyHint } = ctx.dom;
     surface.querySelectorAll('.canvas-card').forEach(el => el.remove());
 

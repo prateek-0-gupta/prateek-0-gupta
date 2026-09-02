@@ -5,7 +5,7 @@ import { blankState, loadState, saveState, saveStateDebounced, pushUndo, undoSta
 import { applyViewport, screenToCanvas, resizeSketch } from './lib/viewport.js';
 import { createCard, softDelete, restoreCard, renderCards, renderTrash } from './lib/cards.js';
 import { renderKanbanBoard, updateKanbanCounts, columnAtCanvasPoint, stackPositionFor, toggleBoard, assignColumn } from './lib/kanban.js';
-import { initSketchState, setSketchTool, toggleSketchPalette, drawStroke, redrawSketch, eraseAt, onSketchMouseDown, onSketchMouseMove, onSketchMouseUp, onSketchDblClick, deleteSelectedStroke } from './lib/sketch.js';
+import { initSketchState, setSketchTool, toggleSketchPalette, redrawSketch, onSketchMouseDown, onSketchMouseMove, onSketchMouseUp, onSketchDblClick, deleteSelectedStroke, sketchEscape, nudgeSelectedStroke, onIdleMouseDown, deselectStroke, TOOL_KEYS } from './lib/sketch.js';
 import { openTriage, closeTriage, triageAction } from './lib/triage.js';
 import { renderDayPlanner, slotAtScreenPoint } from './lib/planner.js';
 import { enterFocus, exitFocus } from './lib/focus.js';
@@ -55,15 +55,16 @@ export default function IThinkThereforeIAm() {
             <div class="triage-progress" id="triage-progress"></div>
         </div>
 
+        <div id="sketch-hint"></div>
         <div id="sketch-palette">
-            <button class="toolbar-btn" data-tool="select"><span>&#8598;</span><span class="tooltip">Select &middot; drag to move &middot; corners to resize &middot; double-click for label</span></button>
-            <button class="toolbar-btn" data-tool="pen"><span>&#9998;</span><span class="tooltip">Pen</span></button>
-            <button class="toolbar-btn" data-tool="line"><span>&#9585;</span><span class="tooltip">Line</span></button>
-            <button class="toolbar-btn" data-tool="arrow"><span>&#8599;</span><span class="tooltip">Arrow</span></button>
-            <button class="toolbar-btn" data-tool="rect"><span>&#9645;</span><span class="tooltip">Box</span></button>
-            <button class="toolbar-btn" data-tool="tri"><span>&#9651;</span><span class="tooltip">Triangle</span></button>
-            <button class="toolbar-btn" data-tool="text"><span>T</span><span class="tooltip">Text &middot; click anywhere to type</span></button>
-            <button class="toolbar-btn" data-tool="eraser"><span>&#9676;</span><span class="tooltip">Eraser</span></button>
+            <button class="toolbar-btn" data-tool="select"><span>&#8598;</span><span class="tooltip">Select (V) &middot; move, resize, label</span></button>
+            <button class="toolbar-btn" data-tool="pen"><span>&#9998;</span><span class="tooltip">Pen (P)</span></button>
+            <button class="toolbar-btn" data-tool="line"><span>&#9585;</span><span class="tooltip">Line (L)</span></button>
+            <button class="toolbar-btn" data-tool="arrow"><span>&#8599;</span><span class="tooltip">Arrow (A)</span></button>
+            <button class="toolbar-btn" data-tool="rect"><span>&#9645;</span><span class="tooltip">Box (R)</span></button>
+            <button class="toolbar-btn" data-tool="tri"><span>&#9651;</span><span class="tooltip">Triangle (6)</span></button>
+            <button class="toolbar-btn" data-tool="text"><span>T</span><span class="tooltip">Text (T) &middot; click anywhere to type</span></button>
+            <button class="toolbar-btn" data-tool="eraser"><span>&#9676;</span><span class="tooltip">Eraser (E)</span></button>
         </div>
 
         <div id="canvas-toolbar">
@@ -292,6 +293,12 @@ function initCanvas() {
             e.target.closest('#triage') || e.target.closest('#settings-panel') ||
             e.target.closest('.thread-hit')) return;
 
+        // A sketch stroke under the cursor is grabbed directly, no tool needed
+        if (onIdleMouseDown(ctx, e)) {
+            if (ctx.selectedCardId) { ctx.selectedCardId = null; renderCards(ctx); }
+            return;
+        }
+
         if (e.detail === 2) {
             const pos = screenToCanvas(ctx, e.clientX, e.clientY);
             createCard(ctx, pos.x - 90, pos.y - 30);
@@ -467,6 +474,7 @@ function initCanvas() {
         }
 
         ctx.selectedCardId = cardEl.dataset.id;
+        deselectStroke(ctx);
         surface.querySelectorAll('.canvas-card.selected').forEach(c => c.classList.remove('selected'));
         cardEl.classList.add('selected');
 
@@ -588,6 +596,8 @@ function initCanvas() {
                 pushUndo(ctx);
                 ctx.state.cards = [];
                 ctx.state.strokes = [];
+                ctx.sketch.selectedId = null;
+                ctx.selectedCardId = null;
                 doRenderAll();
                 saveState(ctx);
             }
@@ -654,7 +664,7 @@ function initCanvas() {
 
         if (e.key === 'Escape') {
             if (triageEl.classList.contains('open')) { closeTriage(ctx); return; }
-            if (ctx.sketch.tool) { setSketchTool(ctx, ctx.sketch.tool); document.getElementById('sketch-palette').classList.remove('open'); return; }
+            if (sketchEscape(ctx)) return;
             if (ctx.focusMode) { exitFocus(ctx); return; }
             dayPlanner.classList.remove('open');
             document.getElementById('trash-list').classList.remove('open');
@@ -665,6 +675,19 @@ function initCanvas() {
 
         if (triageEl.classList.contains('open')) return;
 
+        // Sketch tool hotkeys while the palette is open
+        if (document.getElementById('sketch-palette').classList.contains('open')) {
+            const tool = TOOL_KEYS[e.key.toLowerCase()];
+            if (tool) { e.preventDefault(); setSketchTool(ctx, tool); return; }
+        }
+        // Arrow keys nudge a selected stroke, tool or no tool
+        if (ctx.sketch.selectedId && e.key.startsWith('Arrow')) {
+            const step = e.shiftKey ? 10 : 1;
+            const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+            const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+            if (nudgeSelectedStroke(ctx, dx, dy)) { e.preventDefault(); return; }
+        }
+
         if (e.key === 'k' || e.key === 'K') { toggleBoard(ctx, () => redrawSketch(ctx)); return; }
         if (e.key === 's' || e.key === 'S') { toggleSketchPalette(ctx); return; }
         if (e.key === 'f' || e.key === 'F') { ctx.focusMode ? exitFocus(ctx) : enterFocus(ctx); return; }
@@ -674,12 +697,10 @@ function initCanvas() {
             createCard(ctx, pos.x - 90, pos.y - 30);
             return;
         }
-        if ((e.key === 'Delete' || e.key === 'Backspace') && ctx.sketch.selectedId) {
-            deleteSelectedStroke(ctx);
-            return;
-        }
-        if ((e.key === 'Delete' || e.key === 'Backspace') && ctx.selectedCardId) {
-            softDelete(ctx, ctx.selectedCardId);
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault();     // some WebKit builds treat a bare Backspace as "go back"
+            if (ctx.sketch.selectedId) deleteSelectedStroke(ctx);
+            else if (ctx.selectedCardId) softDelete(ctx, ctx.selectedCardId);
             return;
         }
 
