@@ -20,13 +20,13 @@ export function ArticlesIndex() {
     `;
 }
 
-export function Article(slug) {
-    return function ArticlePage() {
-        const article = getArticle(slug);
-        if (!article) {
-            return `<div class="articles-page"><div class="art-nav"><a href="/articles" data-link>&larr; writings</a></div><h1>Article not found</h1></div>`;
-        }
-        return `
+// Routed as /articles/:slug. The slug arrives in params.
+export function ArticlePage({ params }) {
+    const article = getArticle(params.slug);
+    if (!article) {
+        return `<div class="articles-page"><div class="art-nav"><a href="/articles" data-link>&larr; writings</a></div><h1>Article not found</h1></div>`;
+    }
+    return `
         <div class="articles-page">
             <div class="art-nav">
                 <a href="/articles" data-link>&larr; writings</a>
@@ -39,5 +39,9 @@ export function Article(slug) {
             </div>
         </div>
         `;
-    };
+}
+
+// Kept for anyone who still builds one route per article.
+export function Article(slug) {
+    return () => ArticlePage({ params: { slug } });
 }

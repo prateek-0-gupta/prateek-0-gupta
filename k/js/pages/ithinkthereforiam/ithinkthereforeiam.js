@@ -18,6 +18,7 @@ export default function IThinkThereforeIAm() {
     useEffect(() => {
         if (_cleanup) { _cleanup(); _cleanup = null; }
         _cleanup = initCanvas();
+        return () => { if (_cleanup) { _cleanup(); _cleanup = null; } };
     }, []);
 
     return `
@@ -257,10 +258,12 @@ function initCanvas() {
     applySettings(settings);
 
     // Listen for OS dark mode changes when set to auto
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const onSchemeChange = () => {
         const s = loadSettings();
         if (s.theme === 'auto') applySettings(s);
-    });
+    };
+    darkQuery.addEventListener('change', onSchemeChange);
 
     document.getElementById('settings-toggle').addEventListener('click', () => {
         document.getElementById('settings-dropdown').classList.toggle('open');
@@ -277,11 +280,12 @@ function initCanvas() {
     });
 
     // Close settings when clicking outside
-    document.addEventListener('click', (e) => {
+    const onDocClick = (e) => {
         if (!e.target.closest('#settings-panel')) {
-            document.getElementById('settings-dropdown').classList.remove('open');
+            document.getElementById('settings-dropdown')?.classList.remove('open');
         }
-    });
+    };
+    document.addEventListener('click', onDocClick);
 
     // ============ EVENTS ============
 
@@ -815,6 +819,8 @@ function initCanvas() {
     doRenderAll();
 
     return () => {
+        document.removeEventListener('click', onDocClick);
+        darkQuery.removeEventListener('change', onSchemeChange);
         window.removeEventListener('resize', onResize);
         window.removeEventListener('mousemove', onSketchMove);
         window.removeEventListener('mouseup', onSketchUp);

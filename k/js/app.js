@@ -5,7 +5,16 @@ import P2PChat from './pages/projects/p2pchat/p2pchat.js';
 import Snake from './pages/projects/snake/snake.js';
 import BVHViewer from './pages/projects/bvhviewer/bvhviewer.js';
 import IThinkThereforeIAm from './pages/ithinkthereforiam/ithinkthereforeiam.js';
-import { ArticlesIndex, Article } from './pages/articles/articles.js';
+import { ArticlesIndex, ArticlePage } from './pages/articles/articles.js';
+
+function NotFound({ path }) {
+    return `
+    <div class="articles-page">
+        <div class="art-nav"><a href="/" data-link>&larr; prateek</a></div>
+        <h1>Nothing here</h1>
+        <p class="articles-index-sub">${path} does not exist. Some things never did.</p>
+    </div>`;
+}
 
 const routes = {
     '/': Home,
@@ -18,10 +27,8 @@ const routes = {
     '/ithinkthereforeiam': IThinkThereforeIAm,
     '/ithinkthereforiam': IThinkThereforeIAm,
     '/articles': ArticlesIndex,
-    '/articles/evolution-of-ai-in-media': Article('evolution-of-ai-in-media'),
-    '/articles/top-10-ai-movies': Article('top-10-ai-movies'),
-    '/articles/myth-of-ai': Article('myth-of-ai'),
-    '/articles/history-of-ai': Article('history-of-ai'),
+    '/articles/:slug': ArticlePage,
+    '*': NotFound,
 };
 
 const app = new Framework(routes, '/k');
