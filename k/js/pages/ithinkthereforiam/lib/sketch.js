@@ -3,6 +3,7 @@
 import { uid } from './utils.js';
 import { w2s, screenToCanvas, applyViewport } from './viewport.js';
 import { pushUndo, saveState, saveStateDebounced } from './state.js';
+import { renderThreads, strokeHasThread, pruneThreads } from './threads.js';
 
 export const SHAPE_TOOLS = ['line', 'arrow', 'rect', 'tri'];
 
@@ -19,7 +20,7 @@ const ERASER_R = 14;            // screen px
 
 const HINTS = {
     selectEmpty: 'click a shape to select it · drag empty space to pan · double-click empty space to write',
-    selectSel: 'drag to move · pull a handle to resize · double-click to label · ⌫ delete · arrow keys nudge',
+    selectSel: 'drag to move · handles resize · pull the red spool to thread it · double-click to label · ⌫ delete',
     pen: 'draw freely · Esc when done, then grab anything you drew straight off the canvas',
     shape: 'drag to draw · it is selected the moment you let go',
     text: 'click anywhere to write · click existing text to edit it',
@@ -39,6 +40,7 @@ export function initSketchState() {
         pan: null,          // { x, y } while panning with the select tool
         pointer: null,      // last screen position, for the eraser ring
         ink: '#1A1A1A',
+        thread: '#BF4034',
     };
 }
 
@@ -184,6 +186,17 @@ export function strokeBBox(s) {
     return geomBBox(s);
 }
 
+// World box of a stroke by id, for the thread layer.
+export function strokeBox(ctx, id) {
+    const s = strokeById(ctx, id);
+    return s ? strokeBBox(s) : null;
+}
+
+export function strokeAtScreen(ctx, sx, sy) {
+    const pos = screenToCanvas(ctx, sx, sy);
+    return strokeAt(ctx, pos.x, pos.y);
+}
+
 function pointInTri(p, a, b, c) {
     const sign = (p1, p2, p3) => (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
     const d1 = sign(p, a, b), d2 = sign(p, b, c), d3 = sign(p, c, a);
@@ -257,6 +270,7 @@ export function nudgeSelectedStroke(ctx, dx, dy) {
     pushUndo(ctx);
     translateStroke(s, dx / ctx.viewport.zoom, dy / ctx.viewport.zoom);
     redrawSketch(ctx);
+    if (strokeHasThread(ctx, s.id)) renderThreads(ctx);
     saveStateDebounced(ctx);
     return true;
 }
@@ -292,6 +306,28 @@ function haloBox(ctx, s) {
 
 function handleNear(ctx, s, sx, sy) {
     return handlesFor(ctx, s).find(h => Math.abs(sx - h.x) < HANDLE_HIT && Math.abs(sy - h.y) < HANDLE_HIT) || null;
+}
+
+// The little spool a thread is pulled from: off the right edge of the halo,
+// or beside the middle of a line.
+const SPOOL_R = 6;
+function spoolPoint(ctx, s) {
+    if (s.type === 'line' || s.type === 'arrow') {
+        const a = w2s(ctx, s.from), b = w2s(ctx, s.to);
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
+        return { x: (a.x + b.x) / 2 + nx * 16, y: (a.y + b.y) / 2 + ny * 16 };
+    }
+    const box = haloBox(ctx, s);
+    return { x: box.x2 + 14, y: (box.y1 + box.y2) / 2 };
+}
+
+// Id of the selected stroke when the press lands on its spool, else null.
+export function spoolAt(ctx, e) {
+    const sel = strokeById(ctx, ctx.sketch.selectedId);
+    if (!sel || overUi(e)) return null;
+    const p = spoolPoint(ctx, sel);
+    return Math.hypot(e.clientX - p.x, e.clientY - p.y) <= SPOOL_R + 4 ? sel.id : null;
 }
 
 const HANDLE_CURSOR = {
@@ -370,7 +406,13 @@ function drawHalo(ctx, s, strong) {
         c.setLineDash([]);
     }
     if (strong) {
+        const sp = spoolPoint(ctx, s);
         c.fillStyle = '#fff';
+        c.strokeStyle = ctx.sketch.thread;
+        c.lineWidth = 2;
+        c.beginPath(); c.arc(sp.x, sp.y, SPOOL_R, 0, Math.PI * 2); c.fill(); c.stroke();
+        c.strokeStyle = 'rgba(191,64,52,0.85)';
+        c.lineWidth = 1.2;
         handlesFor(ctx, s).forEach(h => {
             if (h.kind === 'from' || h.kind === 'to') {
                 c.beginPath(); c.arc(h.x, h.y, 4.5, 0, Math.PI * 2); c.fill(); c.stroke();
@@ -455,7 +497,9 @@ function drawEraserRing(ctx) {
 }
 
 export function redrawSketch(ctx) {
-    ctx.sketch.ink = getComputedStyle(ctx.dom.root).getPropertyValue('--text').trim() || '#1A1A1A';
+    const css = getComputedStyle(ctx.dom.root);
+    ctx.sketch.ink = css.getPropertyValue('--text').trim() || '#1A1A1A';
+    ctx.sketch.thread = css.getPropertyValue('--thread').trim() || '#BF4034';
     const dpr = window.devicePixelRatio || 1;
     ctx.sketchCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.sketchCtx.clearRect(0, 0, ctx.dom.sketchCanvas.width / dpr, ctx.dom.sketchCanvas.height / dpr);
@@ -468,8 +512,10 @@ export function redrawSketch(ctx) {
 export function eraseAt(ctx, wx, wy) {
     const r = ERASER_R / ctx.viewport.zoom;
     const before = ctx.state.strokes.length;
+    const gone = ctx.state.strokes.filter(s => strokeHit(s, wx, wy, r));
     ctx.state.strokes = ctx.state.strokes.filter(s => !strokeHit(s, wx, wy, r));
     if (ctx.state.strokes.length !== before) {
+        gone.forEach(s => pruneThreads(ctx, s.id));
         if (!ctx.state.strokes.some(s => s.id === ctx.sketch.selectedId)) ctx.sketch.selectedId = null;
         redrawSketch(ctx);
         saveStateDebounced(ctx);
@@ -480,6 +526,7 @@ export function deleteSelectedStroke(ctx) {
     if (!ctx.sketch.selectedId) return false;
     pushUndo(ctx);
     ctx.state.strokes = ctx.state.strokes.filter(s => s.id !== ctx.sketch.selectedId);
+    pruneThreads(ctx, ctx.sketch.selectedId);
     selectStroke(ctx, null);
     redrawSketch(ctx);
     saveState(ctx);
@@ -535,6 +582,7 @@ export function openLabelEditor(ctx, stroke) {
         else if (stroke.type === 'text') {
             // a text stroke with no text is nothing at all
             ctx.state.strokes = ctx.state.strokes.filter(s => s.id !== stroke.id);
+            pruneThreads(ctx, stroke.id);
             if (ctx.sketch.selectedId === stroke.id) selectStroke(ctx, null);
         }
         else delete stroke.text;
@@ -602,6 +650,7 @@ export function onSketchMouseDown(ctx, e) {
     const pos = screenToCanvas(ctx, e.clientX, e.clientY);
 
     if (sk.tool === 'select') {
+        if (spoolAt(ctx, e)) return;    // the page's own handler pulls the thread
         // a handle on the current selection wins over picking a new stroke
         const sel = strokeById(ctx, sk.selectedId);
         const h = sel ? handleNear(ctx, sel, e.clientX, e.clientY) : null;
@@ -644,6 +693,7 @@ export function onSketchMouseDown(ctx, e) {
 
 export function onSketchMouseMove(ctx, e) {
     const sk = ctx.sketch;
+    if (ctx.linkingFrom) return;    // a thread is being pulled; the page handles that
     const pos = screenToCanvas(ctx, e.clientX, e.clientY);
 
     // Button released off-window: finish up rather than dragging on without it.
@@ -655,7 +705,12 @@ export function onSketchMouseMove(ctx, e) {
     if (sk.tool === 'select' || !sk.tool) {
         if (sk.resizeSel) {
             const s = strokeById(ctx, sk.resizeSel.id);
-            if (s) { applyResize(s, sk.resizeSel, pos); sk.resizeSel.moved = true; redrawSketch(ctx); }
+            if (s) {
+                applyResize(s, sk.resizeSel, pos);
+                sk.resizeSel.moved = true;
+                redrawSketch(ctx);
+                if (strokeHasThread(ctx, s.id)) renderThreads(ctx);
+            }
             return;
         }
         if (sk.dragSel) {
@@ -665,6 +720,7 @@ export function onSketchMouseMove(ctx, e) {
                 sk.dragSel.last = pos;
                 sk.dragSel.moved = true;
                 redrawSketch(ctx);
+                if (strokeHasThread(ctx, s.id)) renderThreads(ctx);
             }
             return;
         }
@@ -681,6 +737,7 @@ export function onSketchMouseMove(ctx, e) {
             setCursor(ctx, '');
             return;
         }
+        if (spoolAt(ctx, e)) { setCursor(ctx, 'crosshair'); return; }
         const sel = strokeById(ctx, sk.selectedId);
         const h = sel ? handleNear(ctx, sel, e.clientX, e.clientY) : null;
         const over = h ? null : strokeAt(ctx, pos.x, pos.y);

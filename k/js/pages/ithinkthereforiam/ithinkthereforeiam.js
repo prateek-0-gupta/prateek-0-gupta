@@ -5,7 +5,7 @@ import { blankState, loadState, saveState, saveStateDebounced, pushUndo, undoSta
 import { applyViewport, screenToCanvas, resizeSketch } from './lib/viewport.js';
 import { createCard, softDelete, restoreCard, renderCards, renderTrash } from './lib/cards.js';
 import { renderKanbanBoard, updateKanbanCounts, columnAtCanvasPoint, stackPositionFor, toggleBoard, assignColumn } from './lib/kanban.js';
-import { initSketchState, setSketchTool, toggleSketchPalette, redrawSketch, onSketchMouseDown, onSketchMouseMove, onSketchMouseUp, onSketchDblClick, deleteSelectedStroke, sketchEscape, nudgeSelectedStroke, onIdleMouseDown, deselectStroke, TOOL_KEYS } from './lib/sketch.js';
+import { initSketchState, setSketchTool, toggleSketchPalette, redrawSketch, onSketchMouseDown, onSketchMouseMove, onSketchMouseUp, onSketchDblClick, deleteSelectedStroke, sketchEscape, nudgeSelectedStroke, onIdleMouseDown, deselectStroke, spoolAt, strokeAtScreen, TOOL_KEYS } from './lib/sketch.js';
 import { openTriage, closeTriage, triageAction } from './lib/triage.js';
 import { renderDayPlanner, slotAtScreenPoint } from './lib/planner.js';
 import { enterFocus, exitFocus } from './lib/focus.js';
@@ -164,6 +164,7 @@ function initCanvas() {
         selectedCardId: null,
         focusMode: false,
         triageQueue: [],
+        linkingFrom: null,          // card or stroke id a thread is being pulled from
     };
     ctx.viewport = ctx.state.viewport || { x: 0, y: 0, zoom: 1 };
     ctx.colorCursor = ctx.state.colorCursor || 0;
@@ -177,7 +178,6 @@ function initCanvas() {
     let dragOffset = { x: 0, y: 0 };
     let dragMoved = false;
     let dragGhost = null;
-    let linkingFrom = null;                       // card id a thread is being pulled from
     let copiedCard = null;                        // internal clipboard for card clones
     let lastMouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
@@ -286,6 +286,9 @@ function initCanvas() {
     // ============ EVENTS ============
 
     root.addEventListener('mousedown', (e) => {
+        // The red spool on a selected shape or text starts a thread, tool or no tool
+        const spool = spoolAt(ctx, e);
+        if (spool) { e.preventDefault(); ctx.linkingFrom = spool; return; }
         if (ctx.sketch.tool) return;
         if (e.target.closest('.canvas-card') || e.target.closest('#canvas-toolbar') ||
             e.target.closest('#day-planner') || e.target.closest('#disclaimer-bar') ||
@@ -316,12 +319,17 @@ function initCanvas() {
     root.addEventListener('mousemove', (e) => {
         lastMouse = { x: e.clientX, y: e.clientY };
 
-        if (linkingFrom) {
+        if (ctx.linkingFrom) {
+            const from = ctx.linkingFrom;
             const pos = screenToCanvas(ctx, e.clientX, e.clientY);
-            setTempThread(ctx, linkingFrom, pos);
+            setTempThread(ctx, from, pos);
             const over = e.target.closest('.canvas-card');
             surface.querySelectorAll('.canvas-card.thread-target').forEach(c => c.classList.remove('thread-target'));
-            if (over && over.dataset.id !== linkingFrom) over.classList.add('thread-target');
+            if (over && over.dataset.id !== from) over.classList.add('thread-target');
+            // a shape or text under the string lights up as a target too
+            const stroke = over ? null : strokeAtScreen(ctx, e.clientX, e.clientY);
+            const hoverId = stroke && stroke.id !== from ? stroke.id : null;
+            if (hoverId !== ctx.sketch.hoverId) { ctx.sketch.hoverId = hoverId; redrawSketch(ctx); }
             return;
         }
 
@@ -364,18 +372,22 @@ function initCanvas() {
     });
 
     root.addEventListener('mouseup', (e) => {
-        if (linkingFrom) {
+        if (ctx.linkingFrom) {
+            const from = ctx.linkingFrom;
             const over = e.target.closest('.canvas-card');
-            const targetId = over ? over.dataset.id : null;
-            if (targetId && targetId !== linkingFrom && !hasThread(ctx, linkingFrom, targetId)) {
+            const stroke = over ? null : strokeAtScreen(ctx, e.clientX, e.clientY);
+            const targetId = over ? over.dataset.id : (stroke ? stroke.id : null);
+            if (targetId && targetId !== from && !hasThread(ctx, from, targetId)) {
                 pushUndo(ctx);
-                ctx.state.threads.push({ id: uid(), from: linkingFrom, to: targetId });
+                ctx.state.threads.push({ id: uid(), from, to: targetId });
                 saveState(ctx);
                 showToast('threaded');
             }
             setTempThread(ctx, null, null);
             surface.querySelectorAll('.canvas-card.thread-target').forEach(c => c.classList.remove('thread-target'));
-            linkingFrom = null;
+            ctx.linkingFrom = null;
+            ctx.sketch.hoverId = null;
+            redrawSketch(ctx);
             renderThreads(ctx);
             return;
         }
@@ -445,7 +457,7 @@ function initCanvas() {
         // Pull a thread from the card's spool
         if (e.target.classList.contains('card-thread-handle')) {
             e.preventDefault();
-            linkingFrom = e.target.dataset.threadFrom;
+            ctx.linkingFrom = e.target.dataset.threadFrom;
             return;
         }
 
