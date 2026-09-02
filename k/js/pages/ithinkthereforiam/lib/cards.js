@@ -82,6 +82,7 @@ function renderCardsNow(ctx) {
         el.style.top = card.y + 'px';
 
         if (ctx.focusMode && ctx.selectedCardId && card.id !== ctx.selectedCardId) el.classList.add('dimmed');
+        if (ctx.sel && ctx.sel.cards.has(card.id)) el.classList.add('selected');
         if (card.id === ctx.selectedCardId) {
             el.classList.add('selected');
             if (ctx.focusMode) el.classList.add('focus-highlight');

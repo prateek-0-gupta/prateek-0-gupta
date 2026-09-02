@@ -17,31 +17,62 @@ export function ensureThreadLayer(ctx) {
     return svg;
 }
 
-function cardCenter(ctx, id) {
+// World-space box of either kind of end: a card from its DOM size, a stroke
+// from its geometry. Null when the end is gone (a card in the trash).
+function itemBox(ctx, id) {
     const card = ctx.state.cards.find(c => c.id === id);
-    if (!card) return null;
-    const el = ctx.dom.surface.querySelector(`.canvas-card[data-id="${id}"]`);
-    const w = el ? el.offsetWidth : 180;
-    const h = el ? el.offsetHeight : 60;
-    return { x: card.x + w / 2, y: card.y + h / 2 };
+    if (card) {
+        const el = ctx.dom.surface.querySelector(`.canvas-card[data-id="${id}"]`);
+        const w = el ? el.offsetWidth : 180, h = el ? el.offsetHeight : 60;
+        return { x1: card.x, y1: card.y, x2: card.x + w, y2: card.y + h };
+    }
+    return strokeBox(ctx, id);
 }
 
-// Where a thread meets an end. Cards hide the knot under themselves, so their
-// centre will do. A stroke is hollow, so the string stops at the edge of its
-// box on the side facing the other end.
-function endpoint(ctx, id, toward = null) {
-    const c = cardCenter(ctx, id);
-    if (c) return c;
-    const b = strokeBox(ctx, id);
-    if (!b) return null;
-    const cx = (b.x1 + b.x2) / 2, cy = (b.y1 + b.y2) / 2;
-    if (!toward) return { x: cx, y: cy };
-    const dx = toward.x - cx, dy = toward.y - cy;
-    const hw = (b.x2 - b.x1) / 2 + 6, hh = (b.y2 - b.y1) / 2 + 6;
-    if (Math.abs(dx) <= hw && Math.abs(dy) <= hh) return { x: cx, y: cy };
-    const t = Math.min(Math.abs(dx) > 1e-6 ? hw / Math.abs(dx) : Infinity,
-                       Math.abs(dy) > 1e-6 ? hh / Math.abs(dy) : Infinity);
-    return { x: cx + dx * t, y: cy + dy * t };
+function center(b) { return { x: (b.x1 + b.x2) / 2, y: (b.y1 + b.y2) / 2 }; }
+
+// Anchor points: three per side, a quarter of the way in from each corner and
+// one in the middle. A string leaves from the side that faces the other end,
+// at whichever of the three points is nearest to it, so two things side by
+// side connect edge to edge and things stacked connect top to bottom.
+const SIDE_NORMAL = { n: { x: 0, y: -1 }, s: { x: 0, y: 1 }, w: { x: -1, y: 0 }, e: { x: 1, y: 0 } };
+const PAD = 4;      // the knot sits just off the edge
+
+function sidePoints(b, side) {
+    const w = b.x2 - b.x1, h = b.y2 - b.y1;
+    const xs = [b.x1 + w * 0.25, b.x1 + w * 0.5, b.x1 + w * 0.75];
+    const ys = [b.y1 + h * 0.25, b.y1 + h * 0.5, b.y1 + h * 0.75];
+    if (side === 'n') return xs.map(x => ({ x, y: b.y1 - PAD }));
+    if (side === 's') return xs.map(x => ({ x, y: b.y2 + PAD }));
+    if (side === 'w') return ys.map(y => ({ x: b.x1 - PAD, y }));
+    return ys.map(y => ({ x: b.x2 + PAD, y }));
+}
+
+function pickAnchor(b, toward) {
+    const c = center(b);
+    const dx = toward.x - c.x, dy = toward.y - c.y;
+    // compare in units of the box so a wide card still prefers its top or
+    // bottom when the other end is clearly above or below it
+    const w = Math.max(1, b.x2 - b.x1), h = Math.max(1, b.y2 - b.y1);
+    const side = Math.abs(dx) / w > Math.abs(dy) / h ? (dx > 0 ? 'e' : 'w') : (dy > 0 ? 's' : 'n');
+    const pts = sidePoints(b, side);
+    let best = pts[0], bestD = Infinity;
+    for (const p of pts) {
+        const d = Math.hypot(toward.x - p.x, toward.y - p.y);
+        if (d < bestD) { bestD = d; best = p; }
+    }
+    return { x: best.x, y: best.y, n: SIDE_NORMAL[side] };
+}
+
+// A thread leaves each side at a right angle, then bends toward the other end
+// with a little sag, like string that was pinned rather than pulled tight.
+function threadPath(a, b) {
+    const dist = Math.hypot(b.x - a.x, b.y - a.y);
+    const reach = Math.min(160, Math.max(24, dist * 0.4));
+    const sag = Math.min(30, dist * 0.08);
+    const c1 = { x: a.x + (a.n ? a.n.x : 0) * reach, y: a.y + (a.n ? a.n.y : 0) * reach + sag };
+    const c2 = { x: b.x + (b.n ? b.n.x : 0) * reach, y: b.y + (b.n ? b.n.y : 0) * reach + sag };
+    return `M ${a.x} ${a.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${b.x} ${b.y}`;
 }
 
 export function strokeHasThread(ctx, id) {
@@ -53,14 +84,6 @@ export function pruneThreads(ctx, id) {
     const before = (ctx.state.threads || []).length;
     ctx.state.threads = (ctx.state.threads || []).filter(t => t.from !== id && t.to !== id);
     if (ctx.state.threads.length !== before) renderThreads(ctx);
-}
-
-// A thread is not a straight wire — it sags a little, like string.
-function threadPath(a, b) {
-    const dist = Math.hypot(b.x - a.x, b.y - a.y);
-    const sag = Math.min(48, dist * 0.12);
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 + sag;
-    return `M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}`;
 }
 
 function mkPath(d, cls) {
@@ -81,9 +104,9 @@ export function renderThreads(ctx) {
     const svg = ensureThreadLayer(ctx);
     svg.querySelectorAll('.thread-g').forEach(g => g.remove());
     for (const t of ctx.state.threads || []) {
-        const ca = endpoint(ctx, t.from), cb = endpoint(ctx, t.to);
-        if (!ca || !cb) continue;   // an end lives in the trash — thread waits, unseen
-        const a = endpoint(ctx, t.from, cb), b = endpoint(ctx, t.to, ca);
+        const ba = itemBox(ctx, t.from), bb = itemBox(ctx, t.to);
+        if (!ba || !bb) continue;   // an end lives in the trash: the thread waits, unseen
+        const a = pickAnchor(ba, center(bb)), b = pickAnchor(bb, center(ba));
         const d = threadPath(a, b);
         const g = document.createElementNS(NS, 'g');
         g.setAttribute('class', 'thread-g');
@@ -102,8 +125,9 @@ export function setTempThread(ctx, fromId, b) {
     const svg = ensureThreadLayer(ctx);
     let p = svg.querySelector('#thread-temp');
     if (!b) { if (p) p.remove(); return; }
-    const a = endpoint(ctx, fromId, b);
-    if (!a) return;
+    const box = itemBox(ctx, fromId);
+    if (!box) return;
+    const a = pickAnchor(box, b);
     if (!p) {
         p = mkPath('', 'thread-path thread-temp');
         p.id = 'thread-temp';

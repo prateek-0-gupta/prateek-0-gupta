@@ -10,6 +10,7 @@ import { openTriage, closeTriage, triageAction } from './lib/triage.js';
 import { renderDayPlanner, slotAtScreenPoint } from './lib/planner.js';
 import { enterFocus, exitFocus } from './lib/focus.js';
 import { renderThreads, setTempThread, hasThread } from './lib/threads.js';
+import { initSelectState, selCount, selHasCard, clearSelection, toggleInSelection, startMarquee, startGroupDrag, selectAll, deleteSelection, nudgeSelection } from './lib/select.js';
 
 let _cleanup = null;
 
@@ -166,7 +167,9 @@ function initCanvas() {
         focusMode: false,
         triageQueue: [],
         linkingFrom: null,          // card or stroke id a thread is being pulled from
+        sel: null,                  // multi-selection, see lib/select.js
     };
+    ctx.sel = initSelectState();
     ctx.viewport = ctx.state.viewport || { x: 0, y: 0, zoom: 1 };
     ctx.colorCursor = ctx.state.colorCursor || 0;
 
@@ -192,6 +195,8 @@ function initCanvas() {
     }
 
     function doUndo() {
+        ctx.sel.cards.clear();
+        ctx.sel.strokes.clear();
         if (undoState(ctx)) {
             doRenderAll();
             showToast('undone');
@@ -313,6 +318,7 @@ function initCanvas() {
         }
 
         ctx.selectedCardId = null;
+        clearSelection(ctx);
         if (ctx.focusMode) exitFocus(ctx); else renderCards(ctx);
 
         isPanning = true;
@@ -489,6 +495,21 @@ function initCanvas() {
             }
         }
 
+        // In a group, the whole card is a handle: shift-click toggles membership,
+        // a plain press anywhere on it drags the group. Editing waits until the
+        // group is dropped.
+        if (e.shiftKey) {
+            e.preventDefault();
+            toggleInSelection(ctx, 'card', cardEl.dataset.id);
+            return;
+        }
+        if (selHasCard(ctx, cardEl.dataset.id)) {
+            e.preventDefault();
+            startGroupDrag(ctx, e);
+            return;
+        }
+
+        clearSelection(ctx);
         ctx.selectedCardId = cardEl.dataset.id;
         deselectStroke(ctx);
         surface.querySelectorAll('.canvas-card.selected').forEach(c => c.classList.remove('selected'));
@@ -676,6 +697,11 @@ function initCanvas() {
             }
             return;
         }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+            e.preventDefault();
+            selectAll(ctx);
+            return;
+        }
         if (e.ctrlKey || e.metaKey || e.altKey) return;
 
         if (e.key === 'Escape') {
@@ -696,12 +722,12 @@ function initCanvas() {
             const tool = TOOL_KEYS[e.key.toLowerCase()];
             if (tool) { e.preventDefault(); setSketchTool(ctx, tool); return; }
         }
-        // Arrow keys nudge a selected stroke, tool or no tool
-        if (ctx.sketch.selectedId && e.key.startsWith('Arrow')) {
+        // Arrow keys nudge a selected stroke or the whole group, tool or no tool
+        if ((ctx.sketch.selectedId || selCount(ctx)) && e.key.startsWith('Arrow')) {
             const step = e.shiftKey ? 10 : 1;
             const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
             const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
-            if (nudgeSelectedStroke(ctx, dx, dy)) { e.preventDefault(); return; }
+            if (selCount(ctx) ? nudgeSelection(ctx, dx, dy) : nudgeSelectedStroke(ctx, dx, dy)) { e.preventDefault(); return; }
         }
 
         if (e.key === 'k' || e.key === 'K') { toggleBoard(ctx, () => redrawSketch(ctx)); return; }
@@ -715,7 +741,8 @@ function initCanvas() {
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();     // some WebKit builds treat a bare Backspace as "go back"
-            if (ctx.sketch.selectedId) deleteSelectedStroke(ctx);
+            if (selCount(ctx)) deleteSelection(ctx);
+            else if (ctx.sketch.selectedId) deleteSelectedStroke(ctx);
             else if (ctx.selectedCardId) softDelete(ctx, ctx.selectedCardId);
             return;
         }
@@ -817,6 +844,14 @@ function initCanvas() {
     onResize();
     window.addEventListener('resize', onResize);
     doRenderAll();
+
+    // Card sizes and label widths depend on the page stylesheet and its fonts,
+    // which arrive after the first paint. Anchor threads and text again once
+    // they are in, or the first render measures unstyled boxes.
+    const settle = () => { renderThreads(ctx); redrawSketch(ctx); };
+    const styleLink = root.querySelector('link[rel="stylesheet"]');
+    if (styleLink) styleLink.addEventListener('load', settle, { once: true });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(settle);
 
     return () => {
         document.removeEventListener('click', onDocClick);

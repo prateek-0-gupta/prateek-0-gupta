@@ -639,6 +639,11 @@ body, html { width: 100%; height: 100%; overflow: hidden; }
 #sketch-canvas.active.tool-select { cursor: default; }
 #sketch-canvas.active.tool-text { cursor: text; }
 #sketch-canvas.active.tool-eraser { cursor: none; }
+#sketch-canvas.active.tool-select { cursor: crosshair; }
+
+/* rubber-band selection and moving a group */
+#canvas-root.marquee, #canvas-root.marquee #sketch-canvas { cursor: crosshair; }
+#canvas-root.group-dragging, #canvas-root.group-dragging .canvas-card { cursor: grabbing; }
 
 /* one line of guidance above the palette, changes with the tool */
 #sketch-hint {

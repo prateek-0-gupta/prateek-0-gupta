@@ -4,6 +4,7 @@ import { uid } from './utils.js';
 import { w2s, screenToCanvas, applyViewport } from './viewport.js';
 import { pushUndo, saveState, saveStateDebounced } from './state.js';
 import { renderThreads, strokeHasThread, pruneThreads } from './threads.js';
+import { selCount, selHasStroke, clearSelection, toggleInSelection, startMarquee, startGroupDrag, onSelectMouseMove, onSelectMouseUp, drawSelectionOverlay } from './select.js';
 
 export const SHAPE_TOOLS = ['line', 'arrow', 'rect', 'tri'];
 
@@ -21,6 +22,8 @@ const ERASER_R = 14;            // screen px
 const HINTS = {
     selectEmpty: 'click a shape to select it · drag empty space to pan · double-click empty space to write',
     selectSel: 'drag to move · handles resize · pull the red spool to thread it · double-click to label · ⌫ delete',
+    group: 'drag any of them to move together · shift-click adds or removes · ⌫ delete · Esc to drop',
+    selectTool: 'drag on empty space to rubber-band a group · shift-click adds to it · double-click empty space to write',
     pen: 'draw freely · Esc when done, then grab anything you drew straight off the canvas',
     shape: 'drag to draw · it is selected the moment you let go',
     text: 'click anywhere to write · click existing text to edit it',
@@ -54,7 +57,8 @@ export function updateSketchHint(ctx) {
     if (!el) return;
     const t = ctx.sketch.tool;
     let text = '';
-    if (t === 'select') text = ctx.sketch.selectedId ? HINTS.selectSel : HINTS.selectEmpty;
+    if (selCount(ctx) > 1) text = `${selCount(ctx)} selected · ` + HINTS.group;
+    else if (t === 'select') text = ctx.sketch.selectedId ? HINTS.selectSel : HINTS.selectTool;
     else if (t === null && ctx.sketch.selectedId) text = HINTS.selectSel;
     else if (t === 'pen') text = HINTS.pen;
     else if (SHAPE_TOOLS.includes(t)) text = HINTS.shape;
@@ -105,6 +109,7 @@ export function toggleSketchPalette(ctx) {
 
 // Escape: drop the selection first, then leave sketching. True when handled.
 export function sketchEscape(ctx) {
+    if (clearSelection(ctx)) return true;
     if (ctx.sketch.selectedId) { deselectStroke(ctx); return true; }
     if (!ctx.sketch.tool) return false;
     closeSketch(ctx);
@@ -258,7 +263,7 @@ export function strokeAt(ctx, wx, wy) {
     return null;
 }
 
-function translateStroke(s, dx, dy) {
+export function translateStroke(s, dx, dy) {
     if (s.type === 'pen') s.points.forEach(p => { p.x += dx; p.y += dy; });
     else if (s.type === 'text') { s.at.x += dx; s.at.y += dy; }
     else { s.from.x += dx; s.from.y += dy; s.to.x += dx; s.to.y += dy; }
@@ -386,7 +391,7 @@ function applyResize(s, rs, pos) {
 
 /* ── Drawing ──────────────────────────────────────────────────────── */
 
-function drawHalo(ctx, s, strong) {
+export function drawHalo(ctx, s, strong) {
     const c = ctx.sketchCtx;
     c.save();
     c.strokeStyle = strong ? 'rgba(191,64,52,0.85)' : 'rgba(191,64,52,0.35)';
@@ -504,6 +509,7 @@ export function redrawSketch(ctx) {
     ctx.sketchCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.sketchCtx.clearRect(0, 0, ctx.dom.sketchCanvas.width / dpr, ctx.dom.sketchCanvas.height / dpr);
     (ctx.state.strokes || []).forEach(s => drawStroke(ctx, s));
+    drawSelectionOverlay(ctx);
     if (ctx.sketch.tool === 'eraser') drawEraserRing(ctx);
 }
 
@@ -629,8 +635,12 @@ export function onIdleMouseDown(ctx, e) {
     const s = strokeAt(ctx, pos.x, pos.y);
     if (!s) {
         deselectStroke(ctx);
+        if (e.shiftKey) { startMarquee(ctx, e); return true; }   // shift-drag on empty space rubber-bands
         return false;
     }
+    if (e.shiftKey) { toggleInSelection(ctx, 'stroke', s.id); return true; }
+    if (selHasStroke(ctx, s.id)) { startGroupDrag(ctx, e); return true; }
+    clearSelection(ctx);
     selectStroke(ctx, s.id);
     if (e.detail === 2) {
         e.preventDefault();     // keep focus on the label input
@@ -660,14 +670,17 @@ export function onSketchMouseDown(ctx, e) {
             return;
         }
         const s = strokeAt(ctx, pos.x, pos.y);
+        if (s && e.shiftKey) { toggleInSelection(ctx, 'stroke', s.id); return; }
+        if (s && selHasStroke(ctx, s.id)) { startGroupDrag(ctx, e); return; }
+        clearSelection(ctx);
         selectStroke(ctx, s ? s.id : null);
         if (s) {
             pushUndo(ctx);
             sk.dragSel = { id: s.id, last: pos, moved: false };
         } else {
-            // empty space: pan, the way the bare canvas does
-            sk.pan = { x: e.clientX - ctx.viewport.x, y: e.clientY - ctx.viewport.y };
-            setCursor(ctx, 'grabbing');
+            // empty space with the select tool: rubber-band a group
+            startMarquee(ctx, e);
+            return;
         }
         redrawSketch(ctx);
         return;
@@ -694,6 +707,7 @@ export function onSketchMouseDown(ctx, e) {
 export function onSketchMouseMove(ctx, e) {
     const sk = ctx.sketch;
     if (ctx.linkingFrom) return;    // a thread is being pulled; the page handles that
+    if (onSelectMouseMove(ctx, e)) return;   // marquee or group drag in progress
     const pos = screenToCanvas(ctx, e.clientX, e.clientY);
 
     // Button released off-window: finish up rather than dragging on without it.
@@ -767,6 +781,7 @@ export function onSketchMouseMove(ctx, e) {
 
 export function onSketchMouseUp(ctx, e) {
     const sk = ctx.sketch;
+    if (onSelectMouseUp(ctx, e)) return;
 
     if (sk.tool === 'select' || !sk.tool) {
         if (sk.resizeSel) {
