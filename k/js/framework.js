@@ -271,7 +271,8 @@ export default class Framework {
         }
         this.current = match;
         await this.update();
-        if (changed) this.scrollAfterNavigation(reason);
+        // a same-page hash link (a contents list, say) also needs a scroll
+        if (changed || location.hash) this.scrollAfterNavigation(reason);
     }
 
     scrollAfterNavigation(reason = 'push') {

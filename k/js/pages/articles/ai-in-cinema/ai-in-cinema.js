@@ -1,0 +1,586 @@
+// The Machine on Screen. A corpus study of AI in science-fiction cinema.
+// Figures, tables and poster panels live beside this file; prose source is article.md.
+// Paths resolve against <base href="/k/">.
+
+const F = 'js/pages/articles/ai-in-cinema/figures';
+const P = 'js/pages/articles/ai-in-cinema/posters';
+
+const HF = 'https://huggingface.co/prateek-0-gupta';
+const GH = 'https://github.com/prateek-0-gupta/allaimovies';
+
+export const AI_IN_CINEMA = {
+    slug: 'ai-in-cinema',
+    title: 'The Machine on Screen',
+    blurb: 'i tested five things i had written about AI in cinema against 2,015 films. three were wrong',
+    html: `
+<header class="art-header">
+    <p class="art-kicker">Research</p>
+    <h1>The Machine on Screen</h1>
+    <p class="art-subtitle">I took five things I had written about AI in cinema and tested them against every science-fiction film TMDB knows about. Three of them were wrong.</p>
+    <p class="art-meta">Prateek Gupta &middot; Future Media Production, Manchester Metropolitan University &middot; September 2026 &middot; <a href="${HF}" target="_blank" rel="noopener">data</a> &middot; <a href="${GH}" target="_blank" rel="noopener">code</a></p>
+</header>
+
+<div class="art-stats">
+    <div class="art-stat"><div class="art-stat-n">3,092</div><div class="art-stat-l">candidate films</div></div>
+    <div class="art-stat"><div class="art-stat-n">2,015</div><div class="art-stat-l">with an AI at the centre</div></div>
+    <div class="art-stat"><div class="art-stat-n">3,263</div><div class="art-stat-l">AI characters tagged</div></div>
+    <div class="art-stat"><div class="art-stat-n">1 of 5</div><div class="art-stat-l">claims survived intact</div></div>
+</div>
+
+<p>A while ago I wrote <a href="/articles/evolution-of-ai-in-media" data-link>an essay on this site</a> about how cinema has portrayed artificial intelligence. It made the usual claims. AI films run on two opposed frames, the machine as social progress and the machine as Pandora's box. Those frames have barely moved since <i>Metropolis</i>. The 1960s took the AI out of a robot body and put it in a computer. Recent films are more nuanced than the old ones. And the machine always, eventually, turns on us.</p>
+
+<p>I still think it was a decent essay. I also noticed, rereading it, that every claim rested on the same thirty films everyone cites, and that I had picked those films because they fit the argument. That is how nearly all writing about robots in film works, mine included. The canon confirms the story because the canon was assembled by people who already believed it.</p>
+
+<p>So I did it the slow way. Every science-fiction film on The Movie Database (TMDB) that carries an AI keyword or mentions AI in its synopsis, 3,092 films in all, coded with one fixed rubric and counted. The 2,015 films where an AI is central or supporting are the population. Their 3,263 AI characters got tagged for body, gender presentation and stance. Then I checked each claim against the numbers, three times over, to see which findings were solid and which were an artefact of what gets uploaded to TMDB.</p>
+
+<p>Here is the short version.</p>
+
+<ol class="art-claims">
+    <li class="art-claim"><span class="art-claim-n">1</span><span class="art-claim-t">Two dominant frames<small>AI is either progress or Pandora's box, and films sort into those camps</small></span><span class="pill pill-no">not supported</span></li>
+    <li class="art-claim"><span class="art-claim-n">2</span><span class="art-claim-t">The frames are constant across history<small>the balance between them has been stable for a century</small></span><span class="pill pill-yes">supported, with a drift</span></li>
+    <li class="art-claim"><span class="art-claim-n">3</span><span class="art-claim-t">The 1960s shift<small>the AI moved from a robot body to a disembodied computer around <i>2001</i></small></span><span class="pill pill-no">not supported</span></li>
+    <li class="art-claim"><span class="art-claim-n">4</span><span class="art-claim-t">Contemporary nuance<small>recent films hold both frames at once more often</small></span><span class="pill pill-weak">weakly supported</span></li>
+    <li class="art-claim"><span class="art-claim-n">5</span><span class="art-claim-t">The Frankenstein complex<small>the creation turning on its creator never went away</small></span><span class="pill pill-yes">supported</span></li>
+</ol>
+
+<p>The rest of this article is how I got there, what else fell out of the data, and what the numbers cannot yet say. If you just want the tables, they are all here. If you want the raw data, it is on <a href="${HF}" target="_blank" rel="noopener">Hugging Face</a> and the pipeline is on <a href="${GH}" target="_blank" rel="noopener">GitHub</a>.</p>
+
+<nav class="art-toc">
+    <div class="art-col-label">Contents</div>
+    <ol>
+        <li><a href="#method">How I built it</a></li>
+        <li><a href="#claim1">Claim 1: two dominant frames</a></li>
+        <li><a href="#claim2">Claim 2: constant across history</a></li>
+        <li><a href="#claim3">Claim 3: the 1960s shift</a></li>
+        <li><a href="#claim4">Claim 4: contemporary nuance</a></li>
+        <li><a href="#claim5">Claim 5: the Frankenstein complex</a></li>
+        <li><a href="#scorecard">The scorecard</a></li>
+        <li><a href="#audiences">What audiences reward</a></li>
+        <li><a href="#who">Who the AI is</a></li>
+        <li><a href="#canon">The films everyone has seen</a></li>
+        <li><a href="#makers">Who makes AI films</a></li>
+        <li><a href="#limits">What the numbers cannot say yet</a></li>
+        <li><a href="#conclusion">Conclusion</a></li>
+    </ol>
+</nav>
+
+<h2 id="method">How I built it</h2>
+
+<h3>The corpus</h3>
+<p>TMDB is the largest film database you can query openly, so that is where I started. I resolved about 130 AI-related keywords (artificial intelligence, robot, android, cyborg, sentient machine, supercomputer, and their many variants) to TMDB keyword ids and pulled every science-fiction film carrying any of them, year by year. Then I widened the net twice. Films tagged with an AI keyword but filed under another genre came in (<i>Big Hero 6</i> is an animation, <i>Eagle Eye</i> is a thriller). Then every science-fiction film whose title or synopsis mentioned an AI term was scanned in, which catches the films TMDB under-tags. One film, <i>Oblivion</i> (2013), I added by hand because its only relevant keyword is "drone".</p>
+
+<p>For every film I fetched the IMDb id and joined IMDb ratings and vote counts from IMDb's public ratings table. Budget, revenue, runtime, countries, genres, cast and crew came from TMDB. I also located subtitles for 924 films and screenplays for 45, but this article uses plot summaries only. The full texts are for a second pass.</p>
+
+<p class="art-table-cap"><b>Table 1.</b> Building the corpus and the analysis population.</p>
+<div class="art-table-wrap">
+<table class="art-table">
+    <thead><tr><th>Stage</th><th class="n">Films</th><th class="n">Share of candidates</th></tr></thead>
+    <tbody>
+        <tr><td><b>Candidate films from TMDB</b></td><td class="n">3,092</td><td class="n">100%</td></tr>
+        <tr><td class="sub">entered via TMDB AI keyword</td><td class="n">1,797</td><td class="n">58%</td></tr>
+        <tr><td class="sub">entered via AI term in overview</td><td class="n">1,294</td><td class="n">42%</td></tr>
+        <tr><td class="sub">manual additions</td><td class="n">1</td><td class="n">0%</td></tr>
+        <tr><td><b>Coded as AI present</b></td><td class="n">2,069</td><td class="n">67%</td></tr>
+        <tr><td><b>AI central or supporting (core population)</b></td><td class="n">2,015</td><td class="n">65%</td></tr>
+        <tr><td class="sub">with at least 100 TMDB votes</td><td class="n">265</td><td class="n">9%</td></tr>
+        <tr><td class="sub">high-confidence coding</td><td class="n">496</td><td class="n">16%</td></tr>
+        <tr><td class="sub">with an IMDb rating</td><td class="n">1,293</td><td class="n">42%</td></tr>
+        <tr><td class="sub">with budget and revenue</td><td class="n">165</td><td class="n">5%</td></tr>
+        <tr><td class="sub">with a subtitle file</td><td class="n">582</td><td class="n">19%</td></tr>
+        <tr><td class="sub">with a screenplay</td><td class="n">35</td><td class="n">1%</td></tr>
+        <tr><td><b>AI characters tagged in core films</b></td><td class="n">3,263</td><td class="n"></td></tr>
+        <tr><td class="sub">in films</td><td class="n">1,884</td><td class="n"></td></tr>
+    </tbody>
+</table>
+<p class="art-table-note">Codings were produced by gpt-5.4-mini from TMDB plot overviews with a fixed rubric. "AI present" excludes documentaries, AI-generated films and metaphorical uses of "robot".</p>
+</div>
+
+<h3>Coding the films</h3>
+<p>Each film's title, year and TMDB overview went to a small language model (OpenAI's gpt-5.4-mini) with a fixed rubric and a JSON schema that forces every answer into a closed set of categories. The rubric defines AI as any artificial mind or autonomous machine intelligence. It excludes aliens, clones, mutants, magic, remote-controlled tools, documentaries and films that were merely made with AI. For each film the model returns:</p>
+<ul>
+    <li><b>AI present</b> (true or false) and <b>AI role</b> (central, supporting, incidental, none).</li>
+    <li><b>Frame</b>: benefit (helper, companion, saviour, a being deserving rights), threat (menace, uprising, control, a warning about hubris), mixed (the film deliberately holds both), or neutral.</li>
+    <li><b>Frame score</b>: an integer from −2 (the AI is the menace) through 0 (neutral or genuinely balanced) to +2 (the AI is the hero).</li>
+    <li><b>Embodiment</b>: humanoid robot, non-humanoid robot, cyborg, disembodied, virtual human, multiple, or unknown.</li>
+    <li><b>Creator betrayal</b>: does the AI turn on its creators, owners or humanity (yes, no, unclear).</li>
+    <li><b>AI sentient</b>: is it shown as self-aware or emotional (yes, no, unclear).</li>
+    <li><b>Confidence</b> (high, medium, low) and a one-sentence <b>rationale</b>.</li>
+</ul>
+<p>The whole corpus coded in one batch for a few dollars with no failures, which still feels slightly absurd to me. The rationale field is what makes each coding auditable. For <i>The Automatic Motorist</i> (1911), the oldest film in the corpus, the model wrote: "A robot chauffeur drives the couple on fantastical journeys, suggesting a helpful autonomous machine rather than a threat." Fair enough.</p>
+
+<h3>Tagging the characters</h3>
+<p>A second pass gave the model each core film's cast list (character and actor as credited), its overview and its film-level coding, and asked it to list every individual AI character with its kind of body, gender presentation, stance (ally, antagonist, ambiguous, neutral), whether it is voice-only, and its prominence (lead, supporting, minor). Gender presentation means how the film presents the machine, not the actor's gender: male, female, none (a genderless "it", like a drone or a ship's computer), mixed, or unknown.</p>
+
+<p>That last category cost me a finding. The first version of the rubric offered "ambiguous" without defining it. The model used it as a dumping ground for characters it could not place, most of them in obscure recent films, and out came a lovely looking "de-gendering of AI" trend. It vanished the moment I replaced the option with an explicit "unknown" and told the model to prefer that over guessing. Every gender result below excludes unknown and mixed characters, and every time trend is checked against the films with at least 100 TMDB votes, where unknown is rare.</p>
+
+<h3>Three populations</h3>
+<p>The analysis population is the 2,015 <b>core</b> films in which an AI is present and central or supporting. The 1,023 excluded candidates are documentaries, AI-generated films, "robot" used as a metaphor, and some genuine misses of summary-based coding. Ash in <i>Alien</i> and the droids in <i>The Force Awakens</i> are both coded absent because TMDB's synopsis never mentions them. I have kept those films for a subtitle-based re-check rather than deleting them.</p>
+
+<p>Every test runs three times: on all core films, on the 265 <b>well-known</b> films with at least 100 TMDB votes, and on the 496 films whose coding the model marked <b>high-confidence</b>. A finding that holds in only one population is reported as fragile. This turned out to be the most important decision in the whole study.</p>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${F}/fig01_corpus_by_year.png" alt="Films with a central or supporting AI by release year" loading="lazy"></div>
+    <figcaption><b>Figure 1.</b> Films with a central or supporting AI by release year and by the route through which they entered the candidate list. (a) All 2,015 core films. (b) The 265 films with at least 100 TMDB votes. The post-2015 surge in (a) is mostly micro-budget and AI-generated productions that barely exist in (b).</figcaption>
+</figure>
+
+<p>Figure 1 is the corpus's biggest bias, drawn. Of the 2,015 core films, 589 were released in 2023 or later, and the 2020s alone hold 862 films against 525 for the whole of the 2010s. Most of these are short, unrated productions. The well-known subset in panel (b) is a different shape entirely: a slow rise from the 1970s and a plateau since 2000. So any trend that shows up in the full corpus but not in the well-known subset is a trend in what gets uploaded, not in what gets watched.</p>
+
+<p>The corpus is also linguistic. English-language films are 1,264 of the 2,015 (63%) and Japanese 259 (13%). Anime and tokusatsu franchises carry a lot of cinema's AI by volume, which as a Gundam and Ghost in the Shell person I was pleased to see.</p>
+
+<p class="art-table-cap"><b>Table 2.</b> Distribution of the AI codings in the core population and in the two robustness subsets.</p>
+<div class="art-table-wrap">
+<table class="art-table">
+    <thead><tr><th>Coding</th><th class="n">All core films<br><span class="th-sub">n = 2,015</span></th><th class="n">≥ 100 TMDB votes<br><span class="th-sub">n = 265</span></th><th class="n">High-confidence<br><span class="th-sub">n = 496</span></th></tr></thead>
+    <tbody>
+        <tr class="g"><td colspan="4">Frame</td></tr>
+        <tr><td>Benefit</td><td class="n">516 (26%)</td><td class="n">55 (21%)</td><td class="n">121 (24%)</td></tr>
+        <tr><td>Threat</td><td class="n">598 (30%)</td><td class="n">82 (31%)</td><td class="n">166 (33%)</td></tr>
+        <tr><td>Mixed</td><td class="n">664 (33%)</td><td class="n">117 (44%)</td><td class="n">201 (41%)</td></tr>
+        <tr><td>Neutral</td><td class="n">237 (12%)</td><td class="n">11 (4%)</td><td class="n">8 (2%)</td></tr>
+        <tr class="g"><td colspan="4">Frame score</td></tr>
+        <tr><td>−2</td><td class="n">325 (16%)</td><td class="n">59 (22%)</td><td class="n">133 (27%)</td></tr>
+        <tr><td>−1</td><td class="n">381 (19%)</td><td class="n">50 (19%)</td><td class="n">69 (14%)</td></tr>
+        <tr><td>0</td><td class="n">775 (38%)</td><td class="n">96 (36%)</td><td class="n">165 (33%)</td></tr>
+        <tr><td>+1</td><td class="n">463 (23%)</td><td class="n">50 (19%)</td><td class="n">98 (20%)</td></tr>
+        <tr><td>+2</td><td class="n">71 (4%)</td><td class="n">10 (4%)</td><td class="n">31 (6%)</td></tr>
+        <tr class="g"><td colspan="4">Embodiment</td></tr>
+        <tr><td>Humanoid robot</td><td class="n">712 (35%)</td><td class="n">102 (38%)</td><td class="n">204 (41%)</td></tr>
+        <tr><td>Non-humanoid robot</td><td class="n">306 (15%)</td><td class="n">35 (13%)</td><td class="n">64 (13%)</td></tr>
+        <tr><td>Cyborg</td><td class="n">146 (7%)</td><td class="n">23 (9%)</td><td class="n">48 (10%)</td></tr>
+        <tr><td>Disembodied</td><td class="n">448 (22%)</td><td class="n">54 (20%)</td><td class="n">100 (20%)</td></tr>
+        <tr><td>Virtual human</td><td class="n">62 (3%)</td><td class="n">7 (3%)</td><td class="n">17 (3%)</td></tr>
+        <tr><td>Multiple</td><td class="n">196 (10%)</td><td class="n">44 (17%)</td><td class="n">59 (12%)</td></tr>
+        <tr><td>Unknown</td><td class="n">145 (7%)</td><td class="n">0 (0%)</td><td class="n">4 (1%)</td></tr>
+        <tr class="g"><td colspan="4">Creator betrayal</td></tr>
+        <tr><td>Yes</td><td class="n">444 (22%)</td><td class="n">105 (40%)</td><td class="n">206 (42%)</td></tr>
+        <tr><td>No</td><td class="n">794 (39%)</td><td class="n">91 (34%)</td><td class="n">191 (39%)</td></tr>
+        <tr><td>Unclear</td><td class="n">777 (39%)</td><td class="n">69 (26%)</td><td class="n">99 (20%)</td></tr>
+        <tr class="g"><td colspan="4">AI sentient</td></tr>
+        <tr><td>Yes</td><td class="n">703 (35%)</td><td class="n">158 (60%)</td><td class="n">307 (62%)</td></tr>
+        <tr><td>No</td><td class="n">95 (5%)</td><td class="n">14 (5%)</td><td class="n">29 (6%)</td></tr>
+        <tr><td>Unclear</td><td class="n">1,217 (60%)</td><td class="n">93 (35%)</td><td class="n">160 (32%)</td></tr>
+        <tr class="g"><td colspan="4">Coding confidence</td></tr>
+        <tr><td>High</td><td class="n">496 (25%)</td><td class="n">154 (58%)</td><td class="n">496 (100%)</td></tr>
+        <tr><td>Medium</td><td class="n">1,009 (50%)</td><td class="n">96 (36%)</td><td class="n">0 (0%)</td></tr>
+        <tr><td>Low</td><td class="n">510 (25%)</td><td class="n">15 (6%)</td><td class="n">0 (0%)</td></tr>
+    </tbody>
+</table>
+</div>
+
+<h3>Statistics, briefly</h3>
+<p>Shares carry Wilson 95% confidence intervals, means carry t-based intervals, medians carry bootstrap intervals. Whether a distribution has two modes is measured with the bimodality coefficient of Pfister and colleagues, with a bootstrap interval; values above 0.555 mean two modes. Frame against decade is a chi-square test with Cramér's V as the effect size. Trends are logistic regressions on release year, reported as an odds ratio per decade. The changepoint in the disembodied share is the year that best splits the series into two levels, again with a bootstrap interval. Every figure uses the Okabe-Ito colour-blind-safe palette: benefit blue, threat vermilion, mixed green, neutral grey. If none of that means anything to you, the verdict boxes are the bit to read.</p>
+
+<p class="art-kicker">Claim 1</p>
+<h2 id="claim1">Two dominant frames</h2>
+
+<p>If films really sort into helpers and menaces, the frame score should have a valley in the middle. The "balanced" category should be sparse. Figure 2 shows the opposite.</p>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${F}/fig02_frame_score_distribution.png" alt="Distribution of the frame score in three populations" loading="lazy"></div>
+    <figcaption><b>Figure 2.</b> Distribution of the frame score (−2 = the AI is the menace, +2 = the AI is the hero) in (a) all core films, (b) films with at least 100 TMDB votes and (c) high-confidence codings only. BC is the bimodality coefficient with a bootstrap 95% CI; values above 0.555 indicate two modes. In every population the distribution has one peak, at 0.</figcaption>
+</figure>
+
+<p>In all three populations the mode is 0. The bimodality coefficient is 0.45 (95% CI 0.43 to 0.47) in the full corpus, 0.47 (0.42 to 0.52) among well-known films and 0.51 (0.48 to 0.54) among high-confidence codings, all below the two-mode threshold. High-confidence codings come closest, because the model is surest about the films with the clearest stance, but even there the middle bin is the largest.</p>
+
+<p>Read as categories rather than scores, "mixed" is the single biggest frame: 33% of all core films, and 44% of well-known ones. Threat is 30%, benefit 26%. The two poles exist. The mass of films sits between them, and among the films people have actually seen the middle is the majority, not a compromise category.</p>
+
+<p>The poster panel below shows what each frame looks like among the most-voted films. The benefit row is Star Wars, Pixar and <i>Interstellar</i>. The threat row is almost entirely the Terminator and Matrix franchises. The mixed row is the prestige tier, from <i>2001</i> and <i>Blade Runner</i> to <i>Her</i> and <i>Ex Machina</i>.</p>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${P}/panel_frames.jpg" alt="The three frames among the most-voted films, as poster rows" loading="lazy"></div>
+    <figcaption>The three frames among the most-voted films. Posters are TMDB images, reproduced for commentary.</figcaption>
+</figure>
+
+<div class="art-verdict no">
+    <div class="art-verdict-label">Verdict</div>
+    <div><b>Not supported as stated.</b> The two poles exist, but films do not sort into them. Most sit in the middle.</div>
+</div>
+
+<p class="art-kicker">Claim 2</p>
+<h2 id="claim2">The frames are constant across history</h2>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${F}/fig03_frame_by_decade.png" alt="Frame of AI films by decade" loading="lazy"></div>
+    <figcaption><b>Figure 3.</b> How the frame of AI films has changed by decade (all 2,015 core films). (a) Composition of each decade; the number above each bar is the decade's film count. (b) Share of threat, benefit and mixed framings with Wilson 95% confidence intervals.</figcaption>
+</figure>
+
+<p class="art-table-cap"><b>Table 4.</b> Frame of the 2,015 core films by decade of release.</p>
+<div class="art-table-wrap">
+<table class="art-table">
+    <thead><tr><th>Decade</th><th class="n">Films</th><th class="n">Benefit</th><th class="n">Threat</th><th class="n">Mixed</th><th class="n">Neutral</th><th class="n">Threat share [95% CI]</th><th class="n">Mixed share</th></tr></thead>
+    <tbody>
+        <tr><td>&lt;1960</td><td class="n">25</td><td class="n">2</td><td class="n">15</td><td class="n">6</td><td class="n">2</td><td class="n">60% [41%, 77%]</td><td class="n">24%</td></tr>
+        <tr><td>1960s</td><td class="n">48</td><td class="n">7</td><td class="n">22</td><td class="n">11</td><td class="n">8</td><td class="n">46% [33%, 60%]</td><td class="n">23%</td></tr>
+        <tr><td>1970s</td><td class="n">66</td><td class="n">24</td><td class="n">18</td><td class="n">18</td><td class="n">6</td><td class="n">27% [18%, 39%]</td><td class="n">27%</td></tr>
+        <tr><td>1980s</td><td class="n">132</td><td class="n">39</td><td class="n">47</td><td class="n">37</td><td class="n">9</td><td class="n">36% [28%, 44%]</td><td class="n">28%</td></tr>
+        <tr><td>1990s</td><td class="n">158</td><td class="n">35</td><td class="n">64</td><td class="n">46</td><td class="n">13</td><td class="n">41% [33%, 48%]</td><td class="n">29%</td></tr>
+        <tr><td>2000s</td><td class="n">199</td><td class="n">35</td><td class="n">65</td><td class="n">76</td><td class="n">23</td><td class="n">33% [27%, 39%]</td><td class="n">38%</td></tr>
+        <tr><td>2010s</td><td class="n">525</td><td class="n">157</td><td class="n">124</td><td class="n">175</td><td class="n">69</td><td class="n">24% [20%, 27%]</td><td class="n">33%</td></tr>
+        <tr><td>2020s</td><td class="n">862</td><td class="n">217</td><td class="n">243</td><td class="n">295</td><td class="n">107</td><td class="n">28% [25%, 31%]</td><td class="n">34%</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The chi-square test finds a statistically significant association between frame and decade in the full corpus (χ² = 60.1, df = 21, p &lt; 0.001), but the effect size is negligible: Cramér's V = 0.10. In the well-known subset (V = 0.15, p = 0.19) and the high-confidence subset (V = 0.12, p = 0.21) the association is not significant at all. On the usual reading of effect sizes, the mix of frames has been consistent in practice. My essay was right about this one.</p>
+
+<p>There is one real drift inside that consistency. Threat framing has fallen. Before 1960, 60% of AI films framed the machine as a menace; in the 2010s and 2020s the figure is under 30%. A logistic regression of threat against benefit on year gives an odds ratio of 0.90 per decade (95% CI 0.84 to 0.96, p = 0.002). The same regression on well-known films gives 0.82 (0.66 to 1.01, p = 0.07) and on high-confidence codings 0.94 (0.84 to 1.06, p = 0.34). The direction is the same everywhere, but the significance depends on the flood of recent small films. And what replaced threat is not benefit. It is "both at once", which has been the most common frame since the 2000s.</p>
+
+<p>The early decades need a caution. Fewer than 50 films survive from before 1960 in this corpus, and that 60% threat share carries an interval from 41% to 77%.</p>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${P}/panel_timeline.jpg" alt="The two most-voted AI films of each decade" loading="lazy"></div>
+    <figcaption>The two most-voted AI films of each decade.</figcaption>
+</figure>
+
+<div class="art-verdict yes">
+    <div class="art-verdict-label">Verdict</div>
+    <div><b>Supported, with a drift.</b> The frame mix differs across decades only negligibly. Inside that stability, the simple villain has become rarer and the ambivalent machine more common.</div>
+</div>
+
+<p class="art-kicker">Claim 3</p>
+<h2 id="claim3">The 1960s moved AI from robots to computers</h2>
+
+<p>This claim is precise enough to test with a date. If <i>2001</i> (1968) marked a shift from the robot body to the disembodied mind, the share of films whose AI has no body should step up in or around the 1960s.</p>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${F}/fig04_embodiment.png" alt="The physical form of the AI by decade and the disembodied share by year" loading="lazy"></div>
+    <figcaption><b>Figure 4.</b> The physical form of the AI. (a) Dominant embodiment by decade among core films with a determinable form. (b) Share of films per year whose AI is disembodied or a virtual human, with a 5-year centred rolling share. The best single changepoint in the share is 2023 (bootstrap 95% CI 2016 to 2023; share 17% before versus 52% after, n = 1,870), not the 1960s.</figcaption>
+</figure>
+
+<p>It does not step up. The disembodied share by decade is 12% before 1960, 8% in the 1960s, 9% in the 1970s, 11% in the 1980s, 12% in the 1990s and 8% in the 2000s. For eighty years roughly one AI film in ten had a computer rather than a robot at its centre, and <i>2001</i> did nothing to that number. The share rises to 21% in the 2010s and 45% in the 2020s, and the best single changepoint in the yearly series is 2023, with a bootstrap interval from 2016 to 2023. The bodiless AI on screen belongs to the decade in which real bodiless AI became a consumer product.</p>
+
+<p>The robustness checks complicate this without rescuing the claim. Among well-known films the disembodied share is high in the 1960s and 1970s (four of five films in the 1960s, which is <i>2001</i> and its neighbours), falls through the 1980s and 1990s, and rises again in the 2020s. The best changepoint there is 1985 with an interval so wide (1979 to 2024) that it says nothing. Among high-confidence codings the changepoint is 2017 (1995 to 2025). What the canon remembers is that <i>2001</i> had a computer villain. What the corpus shows is that the canon is a handful of films sitting on a base rate that did not move.</p>
+
+<p>The humanoid robot has meanwhile lost ground steadily, from 71% of films in the 1960s to 34% in the 2020s. The cyborg peaked in the 1990s (27%, the RoboCop and Ghost in the Shell decade) and the multi-form film (Transformers, Star Wars) holds around a fifth of well-known titles.</p>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${P}/panel_embodiment.jpg" alt="Most-voted films for each kind of AI body" loading="lazy"></div>
+    <figcaption>One row per kind of body: the most-voted films whose AI is a humanoid robot, a non-humanoid robot, a cyborg, disembodied, or a virtual human.</figcaption>
+</figure>
+
+<div class="art-verdict no">
+    <div class="art-verdict-label">Verdict</div>
+    <div><b>Not supported.</b> The turn to disembodied AI is real, but it happened in the late 2010s, not the 1960s.</div>
+</div>
+
+<p class="art-kicker">Claim 4</p>
+<h2 id="claim4">Contemporary films are more nuanced</h2>
+
+<p>If "mixed" is the nuanced frame, the question is whether its share rises with time. In the full corpus it does: 24% before 1960, 27% to 29% through the 1970s to 1990s, 38% in the 2000s, 33% in the 2010s and 34% in the 2020s. A logistic trend gives an odds ratio of 1.08 per decade (95% CI 1.02 to 1.14, p = 0.009).</p>
+
+<p>The finding is fragile. Among well-known films the odds ratio is the same, 1.08, but the interval spans one (0.94 to 1.25, p = 0.29). Among high-confidence codings it is 1.11 (1.00 to 1.22, p = 0.05), right on the boundary. The mixed frame has been the largest since the 2000s among films people have seen, but it was already common in the 1970s and 1980s among the same films, and the rise since then is small.</p>
+
+<div class="art-verdict weak">
+    <div class="art-verdict-label">Verdict</div>
+    <div><b>Weakly supported.</b> Nuance drifts up by about 8% per decade in the odds, and the drift is not significant in the well-known subset.</div>
+</div>
+
+<p class="art-kicker">Claim 5</p>
+<h2 id="claim5">The Frankenstein complex persists</h2>
+
+<p>Asimov named the Frankenstein complex in order to complain about it: the reflex by which every fictional machine eventually turns on the people who built it. The rubric asks directly whether the AI betrays its creators, owners or humanity.</p>
+
+<figure class="art-fig art-fig-narrow">
+    <div class="art-fig-img"><img src="${F}/fig05_creator_betrayal_by_decade.png" alt="Share of films in which the AI turns on its creators, by decade" loading="lazy"></div>
+    <figcaption><b>Figure 5.</b> Share of films in which the AI turns on its creators, by decade, among films with a determinable answer, with Wilson 95% CIs. Decades with fewer than 15 such films are omitted.</figcaption>
+</figure>
+
+<p>Among the 1,238 core films where the answer is determinable, the AI betrays its makers in 36%. Among well-known films the share is 54% (of 196), and among high-confidence codings 52% (of 397). That gap between the corpus and its well-known subset is telling: the films people watch are more likely to contain a betrayal than the films that merely exist. Either betrayal makes a better story, or the model finds it easier to spot in famous films. Probably both.</p>
+
+<p>Across decades the share never leaves the band between 30% and 67%, and the trends are flat or slightly negative: odds ratio 0.93 per decade in the full corpus (0.87 to 0.99, p = 0.02), 0.96 among well-known films (0.82 to 1.13, p = 0.62), 1.04 among high-confidence codings (0.94 to 1.16, p = 0.42). There is no decade without the story and no evidence that it is fading among the films that matter.</p>
+
+<div class="art-verdict yes">
+    <div class="art-verdict-label">Verdict</div>
+    <div><b>Supported.</b> The creation turns on its creator in a third to a half of AI films, in every decade, with no clear trend.</div>
+</div>
+
+<h2 id="scorecard">The scorecard</h2>
+
+<p>All five claims, all three populations, one table. Brackets are 95% confidence intervals. OR is the odds ratio per decade from a logistic regression on release year.</p>
+
+<p class="art-table-cap"><b>Table 3.</b> Tests of the five claims in each population.</p>
+<div class="art-table-wrap art-wide">
+<table class="art-table">
+    <thead><tr><th>Claim</th><th>Statistic</th><th class="n">All core films</th><th class="n">≥ 100 TMDB votes</th><th class="n">High-confidence</th><th>Reading</th></tr></thead>
+    <tbody>
+        <tr><td><b>1.</b> Two dominant frames</td><td class="k">Bimodality coefficient (&gt; 0.555 = two modes)</td><td class="n">0.45 [0.43, 0.47]</td><td class="n">0.47 [0.42, 0.52]</td><td class="n">0.51 [0.48, 0.54]</td><td class="r"><span class="pill pill-no">not supported</span></td></tr>
+        <tr><td rowspan="2"><b>2.</b> Frames constant across history</td><td class="k">Frame × decade, Cramér's V</td><td class="n">0.10<br><span class="pv">p &lt; 0.001</span></td><td class="n">0.15<br><span class="pv">p = 0.19</span></td><td class="n">0.12<br><span class="pv">p = 0.21</span></td><td class="r"><span class="pill pill-yes">supported</span> <span class="pill-note">effect negligible</span></td></tr>
+        <tr><td class="k">Threat vs benefit, OR per decade</td><td class="n">0.90 [0.84, 0.96]<br><span class="pv">p = 0.002</span></td><td class="n">0.82 [0.66, 1.01]<br><span class="pv">p = 0.07</span></td><td class="n">0.94 [0.84, 1.06]<br><span class="pv">p = 0.34</span></td><td class="r"><span class="pill-note">threat declining in the full corpus only</span></td></tr>
+        <tr><td><b>3.</b> 1960s shift to disembodied AI</td><td class="k">Best changepoint in disembodied share</td><td class="n">2023 [2016, 2023]<br>17% to 52%</td><td class="n">1985 [1979, 2024]<br>41% to 21%</td><td class="n">2017 [1995, 2025]<br>15% to 39%</td><td class="r"><span class="pill pill-no">not supported</span></td></tr>
+        <tr><td><b>4.</b> Contemporary films more nuanced</td><td class="k">Mixed frame, OR per decade</td><td class="n">1.08 [1.02, 1.14]<br><span class="pv">p = 0.009</span></td><td class="n">1.08 [0.94, 1.25]<br><span class="pv">p = 0.29</span></td><td class="n">1.11 [1.00, 1.22]<br><span class="pv">p = 0.05</span></td><td class="r"><span class="pill pill-weak">weak</span> <span class="pill-note">not significant among well-known films</span></td></tr>
+        <tr><td><b>5.</b> Frankenstein complex persists</td><td class="k">Creator betrayal, OR per decade</td><td class="n">0.93 [0.87, 0.99]<br><span class="pv">p = 0.02</span></td><td class="n">0.96 [0.82, 1.13]<br><span class="pv">p = 0.62</span></td><td class="n">1.04 [0.94, 1.16]<br><span class="pv">p = 0.42</span></td><td class="r"><span class="pill pill-yes">persists</span> <span class="pill-note">slight decline in the full corpus only</span></td></tr>
+    </tbody>
+</table>
+</div>
+
+<h2 id="audiences">What audiences reward</h2>
+
+<p>The claims are about what cinema shows. A second question is what audiences prefer, and the corpus can answer that descriptively, because every film with an IMDb id carries a rating and a vote count.</p>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${F}/fig06_reception.png" alt="Audience reception by coding: IMDb rating and box-office return" loading="lazy"></div>
+    <figcaption><b>Figure 6.</b> Audience reception by coding. (a) Mean IMDb rating with 95% CI for the 412 core films with at least 1,000 IMDb votes; the vertical line is the grand mean (5.82). (b) Median box-office return (revenue ÷ budget) by frame for the 151 films with a reported budget of at least US$1 million and revenue, with a bootstrap 95% CI.</figcaption>
+</figure>
+
+<p class="art-table-cap"><b>Table 5.</b> Mean IMDb rating by coding for the 412 core films with at least 1,000 IMDb votes.</p>
+<div class="art-table-wrap">
+<table class="art-table">
+    <thead><tr><th>Coding</th><th class="n">n</th><th class="n">Mean</th><th class="n">SD</th><th class="n">95% CI</th></tr></thead>
+    <tbody>
+        <tr class="g"><td colspan="5">Frame</td></tr>
+        <tr><td>Benefit</td><td class="n">90</td><td class="n">6.08</td><td class="n">1.50</td><td class="n">[5.77, 6.40]</td></tr>
+        <tr><td>Threat</td><td class="n">152</td><td class="n">5.28</td><td class="n">1.51</td><td class="n">[5.04, 5.52]</td></tr>
+        <tr><td>Mixed</td><td class="n">151</td><td class="n">6.23</td><td class="n">1.09</td><td class="n">[6.05, 6.40]</td></tr>
+        <tr><td>Neutral</td><td class="n">19</td><td class="n">5.67</td><td class="n">1.65</td><td class="n">[4.87, 6.46]</td></tr>
+        <tr class="g"><td colspan="5">Frame score</td></tr>
+        <tr><td>−2</td><td class="n">107</td><td class="n">5.16</td><td class="n">1.49</td><td class="n">[4.87, 5.44]</td></tr>
+        <tr><td>−1</td><td class="n">75</td><td class="n">5.85</td><td class="n">1.47</td><td class="n">[5.51, 6.18]</td></tr>
+        <tr><td>0</td><td class="n">134</td><td class="n">6.14</td><td class="n">1.15</td><td class="n">[5.94, 6.34]</td></tr>
+        <tr><td>+1</td><td class="n">78</td><td class="n">6.16</td><td class="n">1.41</td><td class="n">[5.84, 6.47]</td></tr>
+        <tr><td>+2</td><td class="n">18</td><td class="n">5.85</td><td class="n">1.74</td><td class="n">[4.99, 6.71]</td></tr>
+        <tr class="g"><td colspan="5">Embodiment</td></tr>
+        <tr><td>Humanoid robot</td><td class="n">151</td><td class="n">5.92</td><td class="n">1.32</td><td class="n">[5.71, 6.13]</td></tr>
+        <tr><td>Non-humanoid robot</td><td class="n">71</td><td class="n">5.60</td><td class="n">1.55</td><td class="n">[5.23, 5.97]</td></tr>
+        <tr><td>Cyborg</td><td class="n">46</td><td class="n">5.44</td><td class="n">1.44</td><td class="n">[5.01, 5.87]</td></tr>
+        <tr><td>Disembodied</td><td class="n">74</td><td class="n">5.91</td><td class="n">1.47</td><td class="n">[5.57, 6.25]</td></tr>
+        <tr><td>Multiple</td><td class="n">57</td><td class="n">6.14</td><td class="n">1.48</td><td class="n">[5.74, 6.53]</td></tr>
+        <tr class="g"><td colspan="5">AI sentient</td></tr>
+        <tr><td>Yes</td><td class="n">200</td><td class="n">6.25</td><td class="n">1.26</td><td class="n">[6.07, 6.42]</td></tr>
+        <tr><td>No</td><td class="n">24</td><td class="n">5.60</td><td class="n">1.45</td><td class="n">[4.99, 6.22]</td></tr>
+        <tr><td>Unclear</td><td class="n">188</td><td class="n">5.39</td><td class="n">1.49</td><td class="n">[5.18, 5.61]</td></tr>
+        <tr class="g"><td colspan="5">Creator betrayal</td></tr>
+        <tr><td>Yes</td><td class="n">151</td><td class="n">5.65</td><td class="n">1.49</td><td class="n">[5.41, 5.89]</td></tr>
+        <tr><td>No</td><td class="n">144</td><td class="n">5.95</td><td class="n">1.43</td><td class="n">[5.72, 6.19]</td></tr>
+        <tr><td>Unclear</td><td class="n">117</td><td class="n">5.88</td><td class="n">1.36</td><td class="n">[5.63, 6.13]</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>The raw differences are big. Films that frame the AI as a threat average 5.28 on IMDb. Mixed films average 6.23 and benefit films 6.08, nearly a full point higher. The score scale has the same shape: the −2 films (5.16) sit well below everything else, and the +2 films (5.85, but there are only 18 of them) are no higher than the +1 films. Films whose AI is shown as sentient average 6.25 against 5.60 for those whose AI is just a program. Betrayal costs about a third of a point.</p>
+
+<p>A regression explains most of this away. An ordinary least squares fit of rating on all the codings, with year, log vote count and language as controls, reaches R² = 0.47, and nearly all of that comes from two controls. Each unit of log votes adds 0.98 points, and non-English films rate 1.29 points higher (call it the Japanese animation effect). The threat coefficient shrinks to −0.44 and is not significant (p = 0.12). The honest reading is that threat films are, on average, cheaper and less watched, and cheap, little-watched films rate lower whatever their AI gets up to.</p>
+
+<p>Box office tells the same story with smaller numbers. Among the 151 films with a reported budget of at least a million dollars, benefit films return a median 1.99 times their budget (bootstrap 95% CI 1.12 to 2.96), mixed films 1.86 (1.54 to 2.30) and threat films 1.42 (0.80 to 1.98). Threat films are also made on smaller budgets: a median of US$20 million against US$30 million for benefit and US$32 million for mixed. In a regression of log return on frame, betrayal, sentience, year and log budget, only budget predicts return.</p>
+
+<p class="art-table-cap"><b>Table 6.</b> Box-office return by frame for the 151 core films with a reported budget of at least US$1 million and revenue.</p>
+<div class="art-table-wrap">
+<table class="art-table">
+    <thead><tr><th>Frame</th><th class="n">n</th><th class="n">Median return</th><th class="n">Bootstrap 95% CI</th><th class="n">Median budget (US$ M)</th><th class="n">Median revenue (US$ M)</th></tr></thead>
+    <tbody>
+        <tr><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">38</td><td class="n">1.99</td><td class="n">[1.12, 2.96]</td><td class="n">30</td><td class="n">77</td></tr>
+        <tr><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">70</td><td class="n">1.86</td><td class="n">[1.54, 2.30]</td><td class="n">32</td><td class="n">67</td></tr>
+        <tr><td><span class="dot dot-threat"></span>Threat</td><td class="n">42</td><td class="n">1.42</td><td class="n">[0.80, 1.98]</td><td class="n">20</td><td class="n">29</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>So audiences rate the friendly and the complicated AI higher than the menacing one, and studios spend more on them. Which way the causation runs, the data cannot say.</p>
+
+<h2 id="who">Who the AI is</h2>
+
+<p>The film-level codings say what a film thinks about its AI. The character-level tags say who the AI is. Across the 1,884 core films with a credited AI there are 3,263 AI characters: 1,690 humanoid robots (52%), 602 disembodied systems (18%), 506 non-humanoid robots (16%), 247 cyborgs (8%) and 218 virtual humans (7%). By presentation, 1,221 are male (37%), 852 female (26%), 536 have no gender (16%), 10 shift or mix, and 644 (20%) could not be determined, nearly all of them in obscure recent films. Everything below uses the 2,159 lead and supporting characters whose gender presentation is male, female or none.</p>
+
+<h3>The AI used to be a man</h3>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${F}/fig07_character_gender_by_decade.png" alt="Gender presentation of AI characters by decade" loading="lazy"></div>
+    <figcaption><b>Figure 7.</b> Gender presentation of lead and supporting AI characters by decade, with Wilson 95% CIs. (a) All films. (b) Films with at least 100 TMDB votes, where "unknown" is rare.</figcaption>
+</figure>
+
+<p>In the full corpus the male share of AI characters falls from around 60% before 2000 to 36% in the 2020s, and the female share rises from 21% to 40%. The logistic trends are strong: odds ratio 0.82 per decade for male presentation (95% CI 0.78 to 0.86) and 1.22 for female (1.15 to 1.30), both p &lt; 0.001.</p>
+
+<p>The well-known subset tells a more careful story, and it is the one I stand behind. Among films with at least 100 TMDB votes, the male share is flat (odds ratio 0.98 per decade, p = 0.76) and the female share rises (1.23, 95% CI 1.06 to 1.43, p = 0.007), from about one in ten characters in the 1970s to one in three in the 2020s. The steep male decline in the full corpus belongs to the flood of obscure recent films, not to the films people watch. What has actually happened among well-known films is that female-presented AIs have been added and the ungendered machine has become rarer (0.81 per decade, p = 0.005), while the male AI has held its ground.</p>
+
+<p class="art-table-cap"><b>Table 8.</b> Logistic regression of each gender presentation on release year among lead and supporting AI characters: odds ratio per decade.</p>
+<div class="art-table-wrap">
+<table class="art-table">
+    <thead><tr><th>Population</th><th>Gender</th><th class="n">n</th><th class="n">OR per decade</th><th class="n">95% CI</th><th class="n">p</th></tr></thead>
+    <tbody>
+        <tr><td rowspan="3">All films</td><td>Male</td><td class="n">2,159</td><td class="n">0.82</td><td class="n">[0.78, 0.86]</td><td class="n">&lt; 0.001</td></tr>
+        <tr><td>Female</td><td class="n">2,159</td><td class="n">1.22</td><td class="n">[1.15, 1.30]</td><td class="n">&lt; 0.001</td></tr>
+        <tr><td>No gender</td><td class="n">2,159</td><td class="n">1.05</td><td class="n">[0.99, 1.12]</td><td class="n">0.13</td></tr>
+        <tr><td rowspan="3">Films with ≥ 100 TMDB votes</td><td>Male</td><td class="n">486</td><td class="n">0.98</td><td class="n">[0.87, 1.10]</td><td class="n">0.76</td></tr>
+        <tr><td>Female</td><td class="n">486</td><td class="n">1.23</td><td class="n">[1.06, 1.43]</td><td class="n">0.007</td></tr>
+        <tr><td>No gender</td><td class="n">486</td><td class="n">0.81</td><td class="n">[0.70, 0.94]</td><td class="n">0.005</td></tr>
+    </tbody>
+</table>
+</div>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${P}/panel_ai_gender.jpg" alt="Films whose lead AI presents as male, female or genderless" loading="lazy"></div>
+    <figcaption>Films whose lead AI presents as male, female or genderless.</figcaption>
+</figure>
+
+<h3>Gender and body are the same fact</h3>
+
+<p>Gender presentation and kind of body are tightly linked (Cramér's V = 0.46). Male and female AIs are both mostly humanoid, 65% and 63%. But a female AI almost never gets a non-humanoid robot body (3%, against 11% for male AIs) and is twice as often a disembodied voice (12% against 6%) or a virtual human (12% against 6%). The ungendered AIs are the drones, ships and systems: 91% of them are non-humanoid robots or disembodied. Samantha in <i>Her</i> and Ava in <i>Ex Machina</i> are the two poles of the female AI, the voice and the perfect body, and there is very little between them.</p>
+
+<p class="art-table-cap"><b>Table 7.</b> Lead and supporting AI characters: kind of body and stance by gender presentation. Row percentages; n = 2,159.</p>
+<div class="art-table-wrap art-wide">
+<table class="art-table">
+    <thead><tr><th>Gender</th><th class="n">n</th><th class="n">Humanoid</th><th class="n">Non-humanoid</th><th class="n">Cyborg</th><th class="n">Disembodied</th><th class="n">Virtual human</th><th class="n sep">Ally</th><th class="n">Ambiguous</th><th class="n">Neutral</th><th class="n">Antagonist</th></tr></thead>
+    <tbody>
+        <tr><td class="nw">Male</td><td class="n">1,018</td><td class="n">65%</td><td class="n">11%</td><td class="n">12%</td><td class="n">6%</td><td class="n">6%</td><td class="n sep">50%</td><td class="n">22%</td><td class="n">5%</td><td class="n">23%</td></tr>
+        <tr><td class="nw">Female</td><td class="n">719</td><td class="n">63%</td><td class="n">3%</td><td class="n">10%</td><td class="n">12%</td><td class="n">12%</td><td class="n sep">36%</td><td class="n">37%</td><td class="n">8%</td><td class="n">20%</td></tr>
+        <tr><td class="nw">No gender</td><td class="n">422</td><td class="n">9%</td><td class="n">41%</td><td class="n">0%</td><td class="n">50%</td><td class="n">0%</td><td class="n sep">23%</td><td class="n">18%</td><td class="n">11%</td><td class="n">47%</td></tr>
+    </tbody>
+</table>
+<p class="art-table-note">Gender × kind: χ² = 916.8, df = 8, p &lt; 0.001, Cramér's V = 0.46. Gender × stance: χ² = 212.9, df = 6, p &lt; 0.001, Cramér's V = 0.22.</p>
+</div>
+
+<h3>The villain has no body and no gender</h3>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${F}/fig08_character_stance.png" alt="Stance of AI characters by kind of body and by gender within kind" loading="lazy"></div>
+    <figcaption><b>Figure 8.</b> Stance of the 3,263 AI characters. (a) Stance by kind of body. (b) Share of characters coded antagonist by gender presentation within each kind, with Wilson 95% CIs.</figcaption>
+</figure>
+
+<p>The stance an AI takes toward the humans depends more on its body than on anything else. Humanoid robots are allies 41% of the time and antagonists 21%. Non-humanoid robots are allies 45% and antagonists 32%. Disembodied systems are allies only 18% and antagonists 36%, the highest of any kind. In a logistic model of antagonist odds with gender, kind and decade all held fixed, a disembodied AI has 2.6 times the antagonist odds of a humanoid robot (95% CI 1.9 to 3.6) and an ungendered AI 2.3 times the odds of a male one (1.7 to 3.2).</p>
+
+<p>Within each kind of body, panel (b) shows the ungendered machine as the antagonist and the gendered ones as roughly alike. Among non-humanoid robots, the ungendered ones are antagonists 47% of the time against 20% for male and 17% for female. Among disembodied AIs, 52% against 25% and 38%.</p>
+
+<p>The AI cinema teaches you to fear is the one you cannot look in the face: Skynet, the Master Control Program, AUTO, the Entity, HAL. The AI it teaches you to love has a body and a name: TARS, R2-D2, Baymax, the Iron Giant, and, after 1984, the Terminator.</p>
+
+<h3>Female AIs are ambivalent, not evil</h3>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${F}/fig09_character_gender_by_stance.png" alt="Stance of AI characters by gender presentation" loading="lazy"></div>
+    <figcaption><b>Figure 9.</b> Stance of lead and supporting AI characters by gender presentation (n = 2,159). (a) Composition of each gender. (b) The same shares with Wilson 95% confidence intervals.</figcaption>
+</figure>
+
+<p>Male-presented AIs are allies half the time (50%) and antagonists 23%. Female-presented AIs are allies 36% and antagonists 20%, and the difference is made up by the ambiguous category: 37% of female AIs are coded as both helping and threatening, or as shifting, against 22% of male AIs. Ungendered AIs are antagonists 47% of the time.</p>
+
+<p>Holding kind and decade fixed, a female AI is no more likely than a male one to be an antagonist (odds ratio 0.88, 95% CI 0.69 to 1.13, p = 0.31) but clearly less likely to be an ally (0.61, 0.49 to 0.74, p &lt; 0.001). The female-AI story in cinema is not menace. It is ambivalence: Ava, M3GAN, Iris in <i>Companion</i>, Mother in <i>I Am Mother</i>, all coded as neither ally nor enemy, all of them the film's question rather than its answer.</p>
+
+<h3>Is there a trend toward evil female AIs?</h3>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${F}/fig10_antagonist_by_gender_over_time.png" alt="Share of AI characters coded antagonist by gender and decade" loading="lazy"></div>
+    <figcaption><b>Figure 10.</b> Share of lead and supporting AI characters coded antagonist, by gender presentation and decade, with Wilson 95% CIs. (a) All films. (b) Films with at least 100 TMDB votes.</figcaption>
+</figure>
+
+<p>No. The female antagonist share sits between 15% and 25% in every decade of the full corpus, flat or slightly falling, and the odds ratio per decade is 0.93 (95% CI 0.82 to 1.04, p = 0.21). Among well-known films it is 0.96 (0.73 to 1.26, p = 0.75). The male trend is the same, 0.93 and 0.95. A female-by-decade interaction term, which directly tests whether the female trend differs from the male one, gives an odds ratio of 1.00 (0.86 to 1.15, p = 0.99) in all films and 1.01 (0.73 to 1.39, p = 0.95) in well-known ones. The two trends are indistinguishable.</p>
+
+<p>The only line in Figure 10 with any shape is the grey one. Ungendered AIs were antagonists 60% to 70% of the time in the 1980s and 1990s and have been under half since the 2010s, as more of them became helpers. TARS and CASE in <i>Interstellar</i>, GERTY in <i>Moon</i> and Claptrap in <i>Borderlands</i> are the recent examples. The older ungendered AIs are Skynet, Colossus, Alpha 60, the Krell machine and the security robots of <i>Chopping Mall</i>.</p>
+
+<p>Era matters on its own. With gender and body held fixed, a 1990s AI character had 1.9 times the antagonist odds of a 2010s one, and the 2020s are, if anything, less hostile than the 2010s (0.76, p = 0.05). The decade of the Matrix and the T-1000 was the peak of the machine villain.</p>
+
+<h2 id="canon">The films everyone has seen</h2>
+
+<p>Corpus statistics describe cinema. Most of us experience a canon. Figure 11 puts the two together by placing every core film with at least 50,000 IMDb votes on the frame scale by year.</p>
+
+<figure class="art-fig art-wide">
+    <div class="art-fig-img"><img src="${F}/fig11_well_known_films_frame_scale.png" alt="The 111 most-voted AI films placed on the frame scale by release year" loading="lazy"></div>
+    <figcaption><b>Figure 11.</b> The 111 core films with at least 50,000 IMDb votes placed on the frame scale by release year. Marker area grows with the log of the vote count; colour is the coded frame. The most-voted films are labelled.</figcaption>
+</figure>
+
+<p>The most-voted films cluster in the middle of the scale. Of the 25 films with the most votes (Table 9), twelve are coded mixed, nine benefit and four threat. The threat films are <i>The Matrix</i> and its first sequel, <i>The Terminator</i> and <i>Oblivion</i>. The pure hero AI at +2 is rare and recent: <i>WALL·E</i>, <i>Big Hero 6</i>, <i>The Iron Giant</i>, <i>Free Guy</i>. The pure menace at −2 is a franchise phenomenon, and the Terminator himself moves from −2 to ally after his first film.</p>
+
+<figure class="art-fig">
+    <div class="art-fig-img"><img src="${P}/panel_top20.jpg" alt="The 20 most-voted AI films" loading="lazy"></div>
+    <figcaption>The 20 most-voted AI films in the corpus.</figcaption>
+</figure>
+
+<p class="art-table-cap"><b>Table 9.</b> The 25 core films with the most IMDb votes and their codings.</p>
+<div class="art-table-wrap art-wide">
+<table class="art-table">
+    <thead><tr><th>Film</th><th class="n">Year</th><th class="n">IMDb votes</th><th class="n">Rating</th><th>Frame</th><th class="n">Score</th><th>Embodiment</th><th>Betrayal</th><th>Confidence</th></tr></thead>
+    <tbody>
+        <tr><td class="nw">Interstellar</td><td class="n">2014</td><td class="n">2,600,684</td><td class="n">8.7</td><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">+1</td><td>Non-humanoid robot</td><td>No</td><td>Medium</td></tr>
+        <tr><td class="nw">The Matrix</td><td class="n">1999</td><td class="n">2,274,808</td><td class="n">8.7</td><td><span class="dot dot-threat"></span>Threat</td><td class="n">−2</td><td>Disembodied</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">Star Wars</td><td class="n">1977</td><td class="n">1,586,728</td><td class="n">8.6</td><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">+1</td><td>Multiple</td><td>No</td><td>High</td></tr>
+        <tr><td class="nw">The Empire Strikes Back</td><td class="n">1980</td><td class="n">1,521,672</td><td class="n">8.7</td><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">+1</td><td>Multiple</td><td>No</td><td>High</td></tr>
+        <tr><td class="nw">WALL·E</td><td class="n">2008</td><td class="n">1,339,683</td><td class="n">8.4</td><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">+2</td><td>Multiple</td><td>No</td><td>High</td></tr>
+        <tr><td class="nw">Terminator 2: Judgment Day</td><td class="n">1991</td><td class="n">1,298,645</td><td class="n">8.6</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">0</td><td>Multiple</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">Avengers: Age of Ultron</td><td class="n">2015</td><td class="n">1,019,791</td><td class="n">7.3</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">−1</td><td>Multiple</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">The Terminator</td><td class="n">1984</td><td class="n">1,016,724</td><td class="n">8.1</td><td><span class="dot dot-threat"></span>Threat</td><td class="n">−2</td><td>Cyborg</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">Blade Runner</td><td class="n">1982</td><td class="n">890,171</td><td class="n">8.1</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">−1</td><td>Humanoid robot</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">Aliens</td><td class="n">1986</td><td class="n">847,230</td><td class="n">8.4</td><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">+1</td><td>Humanoid robot</td><td>No</td><td>Medium</td></tr>
+        <tr><td class="nw">2001: A Space Odyssey</td><td class="n">1968</td><td class="n">791,772</td><td class="n">8.3</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">−1</td><td>Disembodied</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">Blade Runner 2049</td><td class="n">2017</td><td class="n">767,321</td><td class="n">8.0</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">0</td><td>Multiple</td><td>Unclear</td><td>High</td></tr>
+        <tr><td class="nw">Rogue One: A Star Wars Story</td><td class="n">2016</td><td class="n">764,999</td><td class="n">7.8</td><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">+1</td><td>Multiple</td><td>No</td><td>Medium</td></tr>
+        <tr><td class="nw">Her</td><td class="n">2013</td><td class="n">733,187</td><td class="n">8.0</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">+1</td><td>Disembodied</td><td>No</td><td>High</td></tr>
+        <tr><td class="nw">Transformers</td><td class="n">2007</td><td class="n">725,858</td><td class="n">7.1</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">0</td><td>Multiple</td><td>Unclear</td><td>High</td></tr>
+        <tr><td class="nw">Prometheus</td><td class="n">2012</td><td class="n">706,700</td><td class="n">7.0</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">−1</td><td>Humanoid robot</td><td>Unclear</td><td>High</td></tr>
+        <tr><td class="nw">The Matrix Reloaded</td><td class="n">2003</td><td class="n">676,141</td><td class="n">7.2</td><td><span class="dot dot-threat"></span>Threat</td><td class="n">−2</td><td>Multiple</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">Ex Machina</td><td class="n">2015</td><td class="n">645,124</td><td class="n">7.7</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">−1</td><td>Humanoid robot</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">I, Robot</td><td class="n">2004</td><td class="n">620,533</td><td class="n">7.1</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">−1</td><td>Humanoid robot</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">Oblivion</td><td class="n">2013</td><td class="n">590,423</td><td class="n">7.0</td><td><span class="dot dot-threat"></span>Threat</td><td class="n">−2</td><td>Disembodied</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">The Matrix Revolutions</td><td class="n">2003</td><td class="n">579,720</td><td class="n">6.7</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">−1</td><td>Multiple</td><td>Yes</td><td>High</td></tr>
+        <tr><td class="nw">Big Hero 6</td><td class="n">2014</td><td class="n">561,163</td><td class="n">7.8</td><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">+2</td><td>Non-humanoid robot</td><td>No</td><td>High</td></tr>
+        <tr><td class="nw">Passengers</td><td class="n">2016</td><td class="n">504,893</td><td class="n">7.0</td><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">+1</td><td>Humanoid robot</td><td>No</td><td>Medium</td></tr>
+        <tr><td class="nw">Free Guy</td><td class="n">2021</td><td class="n">496,789</td><td class="n">7.1</td><td><span class="dot dot-benefit"></span>Benefit</td><td class="n">+2</td><td>Virtual human</td><td>Unclear</td><td>High</td></tr>
+        <tr><td class="nw">Transformers: Dark of the Moon</td><td class="n">2011</td><td class="n">460,011</td><td class="n">6.2</td><td><span class="dot dot-mixed"></span>Mixed</td><td class="n">0</td><td>Humanoid robot</td><td>Unclear</td><td>High</td></tr>
+    </tbody>
+</table>
+</div>
+
+<p>Table 9 is also the quickest audit available, because it shows the coding at work on films you know. <i>Interstellar</i> is medium-confidence because its synopsis barely mentions TARS. <i>Her</i> is mixed with a positive score, which is right. <i>Aliens</i> is benefit because of Bishop, though anyone who remembers Ash in the first film might object. The first film is coded absent because its synopsis never mentions him, which is the single clearest example of what summary-based coding misses, and the one that annoyed me most.</p>
+
+<h2 id="makers">Who makes AI films</h2>
+
+<p>I fetched cast and crew for every film, which allows a short who's who. The directors with the most core AI films are not the auteurs of the canon. They are the franchise and genre workers: Kim Chung-gi with six Robot Taekwon V films, Albert Pyun with six direct-to-video cyborg films, Michael Bay with five Transformers films (all coded mixed), Mamoru Oshii with five (Patlabor and Ghost in the Shell, three of them mixed), Neill Blomkamp with five, James Cameron with four. Among writers, Lana Wachowski leads with seven, all threat or mixed, and James Cameron has five.</p>
+
+<p>The actors who have played the most AIs are voices. Peter Cullen has fifteen AI roles, nearly all of them Optimus Prime. Frank Welker has twelve, mostly Megatron and Soundwave. Hugo Weaving has six, Agent Smith three times and Megatron three times, every one an antagonist. Nobuyo Oyama voiced Doraemon six times, every one an ally. Arnold Schwarzenegger's five Terminators are an antagonist in 1984 and an ally in every film since. Alan Tudyk's six (Sonny, K-2SO, Cosmo) run from ambiguous to ally.</p>
+
+<p>The producers tell the industrial story most plainly. The Asylum's David Michael Latt has ten AI films, nine of them coded threat: <i>Transmorphers</i>, <i>The Terminators</i>, <i>Robot Apocalypse</i>, <i>Ape vs Mecha Ape</i>. The Transformers producing trio (DeSanto, Murphy, di Bonaventura) have eight each, seven mixed. Jason Blum has five, four mixed: <i>Upgrade</i>, <i>M3GAN</i>, <i>Afraid</i>, <i>M3GAN 2.0</i>. At the top of the industry, the threat frame is a low-budget product. The mixed frame is where the money is.</p>
+
+<h2 id="limits">What the numbers cannot say yet</h2>
+
+<h3>Threats to validity</h3>
+
+<p><b>The coder is a language model reading a synopsis.</b> The rubric is fixed and the output is schema-enforced, but nobody has checked the model against a human yet. Only 496 of 2,015 codings are high-confidence by the model's own account, and that is exactly why every claim above was re-run on that subset. Until a random sample of 100 films has been hand-coded and Cohen's kappa reported, the absolute numbers here are indicative, not citable.</p>
+
+<p><b>The synopsis misses the AI.</b> <i>Alien</i>, <i>The Force Awakens</i> and hundreds of less famous films are coded "no AI" because their TMDB overview never mentions one. Of the 1,023 excluded candidates, 803 carry a TMDB AI keyword and are flagged for a subtitle-based re-check.</p>
+
+<p><b>The corpus is TMDB.</b> Recent micro-budget and AI-generated films are heavily over-represented: 589 of the 2,015 core films date from 2023 or later. Every trend is therefore reported twice, once in the corpus and once in the subset of films with at least 100 votes, and I trust the second whenever they disagree.</p>
+
+<p><b>Reception is descriptive.</b> The rating and box-office gaps between frames are real in the raw data and largely absorbed by popularity, language and budget in the regressions. Nothing here supports a causal claim about what audiences want.</p>
+
+<p><b>Coding is per film, not per franchise.</b> HAL 9000 is coded as an ungendered system in <i>2010</i> and may be coded differently in <i>2001</i>. The Terminator changes stance between films. That is correct behaviour for a film-level study and a hazard for anyone reading the character table as a character encyclopaedia.</p>
+
+<h3>Two findings I withdrew</h3>
+
+<p>A study that never withdraws anything has not checked itself, so here are mine.</p>
+
+<p>The first was a "de-gendering of AI" trend: an apparent rise in AI characters with no gender. It was an artefact of an undefined "ambiguous" option in the first character rubric, which the model used as "unknown", and which piled up in obscure recent films. With an explicit "unknown" the trend disappeared.</p>
+
+<p>The second was a steep decline in male-presented AIs. It is real in the full corpus and absent among well-known films, so I now report it as a property of the corpus rather than of cinema.</p>
+
+<h3>Next</h3>
+
+<ol>
+    <li><b>Human validation.</b> Hand-code a random 100 films with the same rubric and report Cohen's kappa against the model.</li>
+    <li><b>Text-based coding.</b> Run the rubric on the 924 subtitle files to sharpen low-confidence codings, re-check the 803 keyword-tagged "absent" films, and add the things a synopsis cannot give: how sentiment toward the AI moves across the runtime, and whether the AI is called "it", "he" or "she".</li>
+    <li><b>Dialogue share.</b> On the 45 screenplays with speaker labels, measure how much of the film's dialogue the AI itself speaks, as a proxy for whether it is a character or a device.</li>
+    <li><b>Audience perception.</b> Join a survey of how people perceive AI to these categories. That is the only route from "what cinema showed" to "what cinema did".</li>
+</ol>
+
+<figure class="art-fig art-fig-narrow">
+    <div class="art-fig-img"><img src="${F}/fig12_text_coverage.png" alt="Availability of subtitles and screenplays by TMDB popularity" loading="lazy"></div>
+    <figcaption><b>Figure 12.</b> Availability of full text for the core films by TMDB popularity: share with a subtitle file and share with a screenplay. Subtitles exist for nearly every film with a real audience and for almost none of the unrated long tail, which bounds what a subtitle-based re-coding can cover.</figcaption>
+</figure>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Cinema has never sorted its machines into friends and enemies. From <i>Metropolis</i> to <i>Companion</i> the largest group of AI films has held both possibilities at once, and the films people have actually watched hold them most of all. The balance between the frames has barely moved in a century, though the simple villain has become rarer. The bodiless AI that the canon dates to 1968 is, in the corpus, a product of the years since 2016. Nuance has risen a little. And the Frankenstein complex is intact: in every decade, in a third to a half of these films, the machine turns on the people who made it.</p>
+
+<p>Two things came out of the corpus that were never in my essay. Audiences and studios prefer the friendly and the complicated AI to the menacing one, even if most of that preference is a preference for bigger, better-known films. And the machine on screen has changed sex. It used to be a man. Among the films people watch it is now, one time in three, a woman, and she is written as a question rather than a threat. The villain, when there is one, is the thing with no face at all.</p>
+
+<p>I wrote the original essay believing all five claims. I would now keep one and a half of them. That feels like the right ratio for anything written from a canon.</p>
+
+<h2>Data and code</h2>
+
+<p>The film table (3,092 candidates, 2,015 core), the 3,263 AI characters and the raw overview codings are published as three datasets under CC BY-NC 4.0 on <a href="${HF}" target="_blank" rel="noopener">Hugging Face</a> (<i>allaimovies</i>, <i>allaimovies-ai-characters</i>, <i>allaimovies-annotations</i>), each with a card that carries the verbatim rubric. The pipeline, analysis scripts, notebook and figure code are on <a href="${GH}" target="_blank" rel="noopener">GitHub</a>. Every figure here has its datapoints in a CSV beside it and every table exists in Markdown and LaTeX. Subtitles and screenplays are copyrighted and are not distributed. Film metadata is from TMDB (this product uses the TMDB API but is not endorsed or certified by TMDB), ratings are from IMDb's non-commercial datasets, and posters are TMDB images reproduced here for commentary only.</p>
+
+<h2>References</h2>
+<ul class="art-references">
+    <li>Asimov, I. (1969). <i>The Rest of the Robots</i>. On the "Frankenstein complex".</li>
+    <li>Okabe, M. and Ito, K. (2008). <a href="https://jfly.uni-koeln.de/color/" target="_blank" rel="noopener">Color Universal Design: how to make figures and presentations that are friendly to colorblind people</a>. The palette used in every figure.</li>
+    <li>Pfister, R., Schwarz, K. A., Janczyk, M., Dale, R. and Freeman, J. B. (2013). <a href="https://doi.org/10.3389/fpsyg.2013.00700" target="_blank" rel="noopener">Good things peak in pairs: a note on the bimodality coefficient</a>. <i>Frontiers in Psychology</i>, 4, 700.</li>
+    <li>Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. <i>Journal of the American Statistical Association</i>, 22, 209 to 212.</li>
+    <li><a href="https://www.themoviedb.org" target="_blank" rel="noopener">The Movie Database (TMDB) API</a>. Accessed 2026.</li>
+    <li><a href="https://datasets.imdbws.com" target="_blank" rel="noopener">IMDb Non-Commercial Datasets</a>, title.ratings.tsv.gz. Accessed 2026.</li>
+</ul>
+`,
+};

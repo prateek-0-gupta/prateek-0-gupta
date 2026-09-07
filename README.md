@@ -16,7 +16,7 @@ Live at [prat.ee/k](https://prat.ee/k). No framework, no build step, no `node_mo
 
 **Writing**
 
-i love cinema and as a media student I wrote some long-form pieces on how cinema taught us to fear and love machines, a ranked list of AI films, and a history of AI from 1950 to now. They live in `k/js/pages/articles/articles-data.js` as plain HTML strings. 
+i love cinema and as a media student I wrote some long-form pieces on how cinema taught us to fear and love machines, a ranked list of AI films, and a history of AI from 1950 to now. They live in `k/js/pages/articles/articles-data.js` as plain HTML strings. The newest one, a corpus study of 2,015 AI films, has its own folder at `k/js/pages/articles/ai-in-cinema/` with the figures and tables beside the prose.
 
 **Art**
 

@@ -1,0 +1,31 @@
+**Table 5.** Mean IMDb rating by coding for the 412 core films with at least 1,000 IMDb votes.
+
+| Coding | n | Mean | SD | 95% CI |
+|:--|--:|--:|--:|--:|
+| *Frame* |  |  |  |  |
+| Benefit | 90 | 6.08 | 1.50 | [5.77, 6.40] |
+| Threat | 152 | 5.28 | 1.51 | [5.04, 5.52] |
+| Mixed | 151 | 6.23 | 1.09 | [6.05, 6.40] |
+| Neutral | 19 | 5.67 | 1.65 | [4.87, 6.46] |
+| *Frame score* |  |  |  |  |
+| −2 | 107 | 5.16 | 1.49 | [4.87, 5.44] |
+| −1 | 75 | 5.85 | 1.47 | [5.51, 6.18] |
+| 0 | 134 | 6.14 | 1.15 | [5.94, 6.34] |
+| +1 | 78 | 6.16 | 1.41 | [5.84, 6.47] |
+| +2 | 18 | 5.85 | 1.74 | [4.99, 6.71] |
+| *Embodiment* |  |  |  |  |
+| Humanoid robot | 151 | 5.92 | 1.32 | [5.71, 6.13] |
+| Non-humanoid robot | 71 | 5.60 | 1.55 | [5.23, 5.97] |
+| Cyborg | 46 | 5.44 | 1.44 | [5.01, 5.87] |
+| Disembodied | 74 | 5.91 | 1.47 | [5.57, 6.25] |
+| Multiple | 57 | 6.14 | 1.48 | [5.74, 6.53] |
+| *AI sentient* |  |  |  |  |
+| Yes | 200 | 6.25 | 1.26 | [6.07, 6.42] |
+| No | 24 | 5.60 | 1.45 | [4.99, 6.22] |
+| Unclear | 188 | 5.39 | 1.49 | [5.18, 5.61] |
+| *Creator betrayal* |  |  |  |  |
+| Yes | 151 | 5.65 | 1.49 | [5.41, 5.89] |
+| No | 144 | 5.95 | 1.43 | [5.72, 6.19] |
+| Unclear | 117 | 5.88 | 1.36 | [5.63, 6.13] |
+
+*An OLS of rating on all codings with year, log votes and language as controls (R² = 0.47) leaves no coding coefficient significant at the 5% level; popularity and language absorb most of the raw differences (analysis_report.md).*

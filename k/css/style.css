@@ -1238,3 +1238,267 @@ footer {
     .art-cols .art-col { flex: unset !important; width: 100%; }
     .articles-page { padding: 1.5rem 1.2rem 4rem; }
 }
+
+/* ── Research article (ai-in-cinema): tables, figure cards, verdicts ── */
+.art-kicker {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: rgba(255,255,255,0.35);
+    margin: 3.2rem 0 -2.2rem;
+}
+.art-header .art-kicker { margin: 0 0 0.8rem; }
+.art-meta {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 0.02em;
+    margin-top: 1rem;
+}
+.art-meta a { color: rgba(255,255,255,0.55); }
+.art-body h3 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.82);
+    margin: 2.2rem 0 0.7rem;
+    letter-spacing: -0.005em;
+}
+
+/* stats strip */
+.art-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: rgba(255,255,255,0.09);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 2.2rem 0 2.4rem;
+}
+.art-stat { background: #0e0e0e; padding: 1rem 1.1rem; }
+.art-stat-n {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.55rem;
+    font-weight: 400;
+    color: rgba(255,255,255,0.92);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+.art-stat-l {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: rgba(255,255,255,0.38);
+    margin-top: 0.45rem;
+    line-height: 1.4;
+}
+
+/* claims scorecard */
+.art-claims { list-style: none; margin: 1.5rem 0 2rem; padding: 0; }
+.art-claim {
+    display: grid;
+    grid-template-columns: 1.8rem 1fr auto;
+    gap: 0.9rem;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.art-claim:first-child { border-top: 1px solid rgba(255,255,255,0.08); }
+.art-claim-n { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: rgba(255,255,255,0.3); }
+.art-claim-t { color: rgba(255,255,255,0.88); line-height: 1.4; }
+.art-claim-t small { display: block; font-size: 0.82rem; color: rgba(255,255,255,0.42); margin-top: 0.1rem; }
+
+/* contents */
+.art-toc { margin: 2.5rem 0 1rem; }
+.art-toc ol {
+    columns: 2;
+    column-gap: 2rem;
+    margin: 0;
+    padding-left: 1.4rem;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+.art-toc li { margin-bottom: 0.35rem; break-inside: avoid; }
+.art-toc a { color: rgba(255,255,255,0.6); text-decoration-color: transparent; }
+.art-toc a:hover { color: #fff; }
+
+/* pills and dots */
+.pill {
+    display: inline-block;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.55rem;
+    border-radius: 3px;
+    white-space: nowrap;
+    line-height: 1.4;
+    vertical-align: middle;
+}
+.pill-yes  { color: #5fd7ae; background: rgba(0,158,115,0.16); }
+.pill-no   { color: #ffa06a; background: rgba(213,94,0,0.18); }
+.pill-weak { color: #f0c75e; background: rgba(230,159,0,0.16); }
+.pill-note { font-size: 0.75rem; color: rgba(255,255,255,0.4); white-space: normal; }
+.dot {
+    display: inline-block;
+    width: 0.55em; height: 0.55em;
+    border-radius: 50%;
+    margin-right: 0.5em;
+    vertical-align: 0.05em;
+}
+.dot-benefit { background: #0072B2; }
+.dot-threat  { background: #D55E00; }
+.dot-mixed   { background: #009E73; }
+.dot-neutral { background: #7f7f7f; }
+
+/* verdict box */
+.art-verdict {
+    display: flex;
+    gap: 1.2rem;
+    align-items: baseline;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-left-width: 3px;
+    border-radius: 4px;
+    padding: 0.95rem 1.2rem;
+    margin: 1.8rem 0 1rem;
+    background: rgba(255,255,255,0.025);
+    line-height: 1.6;
+}
+.art-verdict.yes  { border-left-color: #009E73; }
+.art-verdict.no   { border-left-color: #D55E00; }
+.art-verdict.weak { border-left-color: #E69F00; }
+.art-verdict-label {
+    flex-shrink: 0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: rgba(255,255,255,0.4);
+}
+
+/* figure cards: the charts are white-background PNGs, so they sit on a light card */
+.art-fig { margin: 2.2rem 0; }
+.art-fig-img {
+    background: #f6f6f3;
+    border-radius: 6px;
+    padding: 0.9rem;
+}
+.art-fig-img img { display: block; width: 100%; height: auto; border-radius: 2px; }
+.art-fig figcaption {
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.42);
+    margin-top: 0.75rem;
+    line-height: 1.55;
+}
+.art-fig figcaption b { color: rgba(255,255,255,0.72); font-weight: 600; }
+.art-fig-narrow .art-fig-img { max-width: 520px; margin: 0 auto; }
+.art-fig-narrow figcaption { max-width: 520px; margin-left: auto; margin-right: auto; }
+
+/* wide breakout for big figures and wide tables */
+.art-wide {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(1000px, calc(100vw - 4rem));
+}
+
+/* tables */
+.art-table-wrap {
+    overflow-x: auto;
+    margin: 1.8rem 0 2rem;
+}
+.art-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+.art-table-cap {
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.45);
+    margin: 1.8rem 0 0 !important;
+    line-height: 1.5;
+}
+.art-table-cap + .art-table-wrap { margin-top: 0.7rem; }
+.art-table-cap b { color: rgba(255,255,255,0.8); font-family: 'Outfit', sans-serif; font-weight: 600; }
+.art-table th {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(255,255,255,0.45);
+    text-align: left;
+    vertical-align: bottom;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    white-space: nowrap;
+}
+.art-table th .th-sub {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.66rem;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: rgba(255,255,255,0.3);
+    margin-top: 0.15rem;
+}
+.art-table td {
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    vertical-align: top;
+    color: rgba(255,255,255,0.72);
+}
+.art-table th.n, .art-table td.n {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.art-table th.n { font-family: 'Outfit', sans-serif; font-size: 0.68rem; }
+.art-table th.sep, .art-table td.sep { border-left: 1px solid rgba(255,255,255,0.12); }
+.art-table tr.g td {
+    padding: 1rem 0.7rem 0.35rem;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: rgba(255,255,255,0.38);
+    border-bottom: none;
+}
+.art-table td.sub { padding-left: 1.7rem; color: rgba(255,255,255,0.5); }
+.art-table tbody tr:not(.g):hover td { background: rgba(255,255,255,0.03); }
+.art-table td b { color: rgba(255,255,255,0.9); font-weight: 500; }
+.art-table-note {
+    font-size: 0.76rem;
+    color: rgba(255,255,255,0.36);
+    margin: 0.6rem 0 0 !important;
+    line-height: 1.55;
+}
+.art-table td.nw { white-space: nowrap; }
+.art-table td.k { min-width: 11rem; }
+.art-table td.r { min-width: 10rem; }
+.art-table .pv { display: block; font-size: 0.68rem; color: rgba(255,255,255,0.38); margin-top: 0.1rem; }
+.art-references { font-size: 0.9rem; color: rgba(255,255,255,0.6); }
+
+@media (max-width: 900px) {
+    .art-wide { width: calc(100vw - 3rem); }
+}
+@media (max-width: 640px) {
+    .art-stats { grid-template-columns: repeat(2, 1fr); }
+    .art-toc ol { columns: 1; }
+    .art-wide { width: calc(100vw - 2.4rem); }
+    .art-verdict { flex-direction: column; gap: 0.4rem; }
+    .art-claim { grid-template-columns: 1.4rem 1fr; }
+    .art-claim .pill { grid-column: 2; justify-self: start; }
+    .art-fig-img { padding: 0.5rem; }
+    .art-table td:first-child, .art-table th:first-child { white-space: nowrap; }
+}
