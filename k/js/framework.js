@@ -135,7 +135,8 @@ function morphNode(parent, oldNode, newNode) {
             parent.replaceChild(newNode.cloneNode(true), oldNode);
             return;
         }
-        if (oldNode.hasAttribute('data-morph-ignore')) return;
+        // only when both sides opt out: a page change must still replace it
+        if (oldNode.hasAttribute('data-morph-ignore') && newNode.hasAttribute('data-morph-ignore')) return;
         morphAttributes(oldNode, newNode);
         morphChildren(oldNode, newNode);
     }
@@ -271,7 +272,8 @@ export default class Framework {
         }
         this.current = match;
         await this.update();
-        if (changed) this.scrollAfterNavigation(reason);
+        // a same-page hash link (a contents list, say) also needs a scroll
+        if (changed || location.hash) this.scrollAfterNavigation(reason);
     }
 
     scrollAfterNavigation(reason = 'push') {
@@ -330,6 +332,7 @@ export default class Framework {
         this.decorateLinks();
         flushEffects();
         this.afterRender();
+        if (typeof this.onRender === 'function') this.onRender(match);
     }
 
     // Give data-links real hrefs (so open-in-new-tab and copy-link work) and

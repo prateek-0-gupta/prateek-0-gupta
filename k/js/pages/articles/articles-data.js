@@ -1,9 +1,14 @@
 // Articles migrated from pr4t33k.cargo.site (uni writings, Future Media Production @ MMU).
 // Media lives in js/pages/articles/assets/ — all resolved against <base href="/k/">.
 
+import { AI_IN_CINEMA } from './ai-in-cinema/ai-in-cinema.js';
+import { AITOY } from './aitoy/aitoy.js';
+
 const A = 'js/pages/articles/assets';
 
 export const ARTICLES = [
+    AITOY,
+    AI_IN_CINEMA,
     {
         slug: 'evolution-of-ai-in-media',
         title: 'The Evolution of AI in Media, Cinema, and Literature',

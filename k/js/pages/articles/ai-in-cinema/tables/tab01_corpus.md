@@ -1,0 +1,20 @@
+**Table 1.** Construction of the corpus and the analysis population.
+
+| Stage | Films | Share of candidates |
+|:--|--:|--:|
+| Candidate films from TMDB | 3,092 | 100% |
+|   entered via TMDB AI keyword | 1,797 | 58% |
+|   entered via AI term in overview | 1,294 | 42% |
+|   manual additions | 1 | 0% |
+| Coded as AI present | 2,069 | 67% |
+| AI central or supporting (core population) | 2,015 | 65% |
+|   with at least 100 TMDB votes | 265 | 9% |
+|   high-confidence coding | 496 | 16% |
+|   with an IMDb rating | 1,293 | 42% |
+|   with budget and revenue | 165 | 5% |
+|   with a subtitle file | 582 | 19% |
+|   with a screenplay | 35 | 1% |
+| AI characters tagged in core films | 3,263 |  |
+|   in films | 1,884 |  |
+
+*Codings were produced by gpt-5.4-mini from TMDB plot overviews with a fixed rubric; 'AI present' excludes documentaries, AI-generated films and metaphorical uses of 'robot'.*

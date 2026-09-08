@@ -1,0 +1,17 @@
+{
+  "name": "prat.ee/k — Prateek Gupta",
+  "short_name": "prat.ee/k",
+  "description": "A retro desktop of side projects, tools and writing by Prateek Gupta.",
+  "start_url": "/k/",
+  "scope": "/k/",
+  "display": "standalone",
+  "background_color": "#0a3f95",
+  "theme_color": "#1a7fd0",
+  "lang": "en-GB",
+  "icons": [
+    { "src": "/k/media/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/k/media/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/k/media/maskable-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/k/media/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

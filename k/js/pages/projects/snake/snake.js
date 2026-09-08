@@ -32,6 +32,9 @@ export default function SnakePage() {
     useEffect(() => {
         if (_cleanup) { _cleanup(); _cleanup = null; }
         _cleanup = initGothicSnakeRPG();
+        // the game must stop when the page is left: its timers hold on to
+        // elements the framework will recycle for the next page
+        return () => { if (_cleanup) { _cleanup(); _cleanup = null; } };
     },[]);
 
     return `
@@ -336,6 +339,8 @@ export default function SnakePage() {
 }
 
 function initGothicSnakeRPG() {
+    let loadTimer = null;      // loading-overlay fade
+    let ambientKick = null;    // first ambient quote
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const scoreUI = document.getElementById('scoreVal');
@@ -457,7 +462,7 @@ function initGothicSnakeRPG() {
         if (loadingOvl) {
             loadingOvl.style.transition = 'opacity 0.6s ease';
             loadingOvl.style.opacity = '0';
-            setTimeout(() => {
+            loadTimer = setTimeout(() => {
                 loadingOvl.style.display = 'none';
                 // Now show lore overlay if first time
                 if (loreOvl && !_loreShown) loreOvl.style.display = 'flex';
@@ -590,7 +595,7 @@ function initGothicSnakeRPG() {
     // Show ambient quotes periodically (every 15-25 seconds)
     let ambientInterval = null;
     function startAmbientQuotes() {
-        setTimeout(() => showQuote('ambient', 5000), 3000);
+        ambientKick = setTimeout(() => showQuote('ambient', 5000), 3000);
         ambientInterval = setInterval(() => {
             if (isDead) return;
             const roll = Math.random();
@@ -1533,6 +1538,8 @@ function initGothicSnakeRPG() {
         canvas.removeEventListener('touchcancel', onTouchEnd);
         if (raf) cancelAnimationFrame(raf);
         if (quoteTimer) clearTimeout(quoteTimer);
+        if (ambientKick) clearTimeout(ambientKick);
+        if (loadTimer) clearTimeout(loadTimer);
         if (ambientInterval) clearInterval(ambientInterval);
         soundtrack.stop();
     };
