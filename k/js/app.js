@@ -43,16 +43,14 @@ const app = new Framework(routes, '/k');
 // The static shells written by tools/build_routes.py carry the same values
 // for crawlers; this keeps them right during client-side navigation.
 const SITE = 'https://prat.ee';
-const DEFAULT_META = {
-    title: document.title,
-    description: document.querySelector('meta[name="description"]')?.content || '',
-};
+const DESCRIPTION = 'Hi, I am Prateek, a transdisciplinary multimedia artist. I study AI and blend future media with traditional media tools, and I work as a Software Engineer at Sum Vivas Ltd.';
+const DEFAULT_META = { title: document.title, description: DESCRIPTION };
 const PAGE_META = {
-    '/articles':          { title: 'Writing — Prateek Gupta', description: 'Long-form pieces on AI in cinema, a corpus study of 2,015 AI films, and a reverse-engineered £20 ESP32 voice board.' },
-    '/snake':             { title: 'Nagmani — Prateek Gupta', description: 'An Indian gothic snake game. The snake is cursed. So are you if you keep playing.' },
-    '/p2pchat':           { title: 'p2p chat — Prateek Gupta', description: 'A serverless chat over WebRTC. Your messages go from your browser to theirs and nowhere else.' },
-    '/bvhviewer':         { title: 'BVH Viewer — Prateek Gupta', description: 'Drop a .bvh motion-capture file in and watch a skeleton do whatever the actor did that day.' },
-    '/ithinkthereforiam': { title: 'I Think Therefore I Am — Prateek Gupta', description: 'An infinite canvas for dumping thoughts. Everything stays in your browser.' },
+    '/articles':          { title: 'Writing — Prateek Gupta', description: DESCRIPTION },
+    '/snake':             { title: 'Nagmani — Prateek Gupta', description: DESCRIPTION },
+    '/p2pchat':           { title: 'p2p chat — Prateek Gupta', description: DESCRIPTION },
+    '/bvhviewer':         { title: 'BVH Viewer — Prateek Gupta', description: DESCRIPTION },
+    '/ithinkthereforiam': { title: 'I Think Therefore I Am — Prateek Gupta', description: DESCRIPTION },
 };
 
 function setMeta(sel, attr, value) {
@@ -64,7 +62,7 @@ app.onRender = (match) => {
     let meta = PAGE_META[match.path] || (match.path === '/' ? DEFAULT_META : null);
     if (!meta && match.params?.slug) {
         const a = ARTICLES.find(x => x.slug === match.params.slug);
-        if (a) meta = { title: `${a.title} — Prateek Gupta`, description: a.blurb.charAt(0).toUpperCase() + a.blurb.slice(1) };
+        if (a) meta = { title: `${a.title} — Prateek Gupta`, description: DESCRIPTION };
     }
     if (!meta) meta = match.notFound ? { title: 'Nothing here — Prateek Gupta', description: DEFAULT_META.description } : DEFAULT_META;
     const url = SITE + '/k' + (match.path === '/' ? '/' : match.path);
