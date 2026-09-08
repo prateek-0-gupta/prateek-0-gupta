@@ -1,286 +1,1123 @@
-import { useEffect } from '../framework.js';
+// Home: a retro desktop. Every page on the site is an icon; the tools open
+// as windows on top of the desktop, articles open as rich-text documents,
+// pictures open in an image viewer, the short film opens as an embed, and
+// the About window doubles as the old landing page.
+
+import { useEffect, navigate } from '../framework.js';
 import { ARTICLES } from './articles/articles-data.js';
+import { POSTERS } from '../poster-manifest.js';
+import { initJigsawTypography } from '../components/jigsaw.js';
+import { ICONS } from '../components/desktop-icons.js';
 
-let _jigsawCleanup = null;
+// ── Content ──────────────────────────────────────────────────────────
 
-const PROJECTS = [
-    { title: 'Nagmani',               desc: 'an Indian gothic snake game',              href: '/snake',                        tag: 'game' },
-    { title: 'Digital Human',         desc: 'three.js based AI-driven Digital Human',   href: 'https://avatar.sumvivas.com',   tag: 'ai', external: true },
-    { title: 'Digital Doppelgänger',  desc: 'a short film',                             href: 'https://youtu.be/xPZ85jpZTsw',  tag: 'film', external: true },
-    { title: 'p2p chat',              desc: 'a serverless p2p chat',                    href: '/p2pchat',                      tag: 'web' },
-    { title: 'BVH Viewer',            desc: 'a BVH motion-capture file viewer',         href: '/bvhviewer',                    tag: '3d tool' },
-    { title: 'I Think Therefore I Am', desc: 'an infinite thought canvas',              href: '/ithinkthereforiam',            tag: 'tool' }
+const POSTER_DIR = 'js/pages/projects/posters/assets';
+const STORE_KEY = 'prateek-desktop-icons-v1';
+const BIN_KEY = 'prateek-desktop-bin-v1';
+const WALL_KEY = 'prateek-desktop-wall-v1';
+
+const TOOLS = [
+    { id: 'about',   label: 'About Me',                 icon: 'computer', kind: 'about', desc: 'prat.ee/k — Manchester, UK' },
+    { id: 'snake',   label: 'Nagmani',                  icon: 'snake',    kind: 'app',   href: '/snake',            desc: 'an Indian gothic snake game' },
+    { id: 'p2pchat', label: 'p2p chat',                 icon: 'chat',     kind: 'app',   href: '/p2pchat',          desc: 'a serverless p2p chat' },
+    { id: 'bvh',     label: 'BVH Viewer',               icon: 'mocap',    kind: 'app',   href: '/bvhviewer',        desc: 'a BVH motion-capture file viewer' },
+    { id: 'think',   label: 'I Think Therefore I Am',   icon: 'bulb',     kind: 'app',   href: '/ithinkthereforiam', desc: 'an infinite thought canvas' },
+    { id: 'human',   label: 'Digital Human',            icon: 'human',    kind: 'link',  href: 'https://avatar.sumvivas.com', desc: 'three.js based AI-driven Digital Human' },
+    { id: 'film',    label: 'Digital Doppelgänger',     icon: 'film',     kind: 'video', video: 'xPZ85jpZTsw',      desc: 'a short film' },
+    { id: 'posters', label: 'Posters',                  icon: 'folder',   kind: 'folder', desc: 'poster art, a hundred-odd of them' },
+    { id: 'music',   label: 'Monsoon Protocol',         icon: 'music',    kind: 'audio', track: 'https://soundcloud.com/prateek-gupta-505317056/2026-09-07t16_31_11-216z', desc: 'a song, on SoundCloud' },
 ];
 
-const SOCIALS = `
-    <a href="https://www.instagram.com/chai.and.photoshop" target="_blank" rel="noopener">Instagram</a>
-    <a href="https://www.linkedin.com/in/prateek-gupta08" target="_blank" rel="noopener">LinkedIn</a>
-    <a href="mailto:prateekgupta1198@gmail.com">E-mail</a>
-`;
+const SOCIALS = [
+    { id: 'instagram', label: 'Instagram', icon: 'camera',   kind: 'link', href: 'https://www.instagram.com/chai.and.photoshop', desc: 'drawings and photographs' },
+    { id: 'linkedin',  label: 'LinkedIn',  icon: 'linkedin', kind: 'link', href: 'https://www.linkedin.com/in/prateek-gupta08', desc: 'the professional one' },
+    { id: 'mail',      label: 'E-mail',    icon: 'mail',     kind: 'link', href: 'mailto:prateekgupta1198@gmail.com', desc: 'say hello' },
+];
 
-function indexRow(item, i) {
-    const num = String(i + 1).padStart(2, '0');
-    const linkAttrs = item.external
-        ? `href="${item.href}" target="_blank" rel="noopener"`
-        : `href="${item.href}" data-link`;
+// these land at random spots on the desktop, like files someone saved in a hurry
+const LINKS = [
+    { id: 'hf-movies', label: 'allaimovies',   icon: 'dataset', kind: 'link', href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies',               desc: 'dataset: 3,090 films with an AI in them, coded and counted' },
+    { id: 'hf-chars',  label: 'ai characters', icon: 'dataset', kind: 'link', href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies-ai-characters', desc: 'dataset: 3,263 AI characters from 1,884 films' },
+    { id: 'companyhouse', label: 'companyhouse', icon: 'repo', kind: 'link', href: 'https://github.com/prateek-0-gupta/companyhouse',                          desc: 'UK Companies House reports and a director interlock graph' },
+    { id: 'aitoy',     label: 'aitoy',         icon: 'robot',   kind: 'link', href: 'https://github.com/prateek-0-gupta/aitoy',                                desc: 'a £20 ESP32-S3 board turned into a push-to-talk voice assistant' },
+];
+
+const BIN = { id: 'bin', label: 'Recycle Bin', icon: 'bin', kind: 'bin', desc: 'contains anything you dragged onto it' };
+
+const WALLS = [
+    { id: 'aero',   label: 'Aero' },
+    { id: 'sunset', label: 'Sunset' },
+    { id: 'night',  label: 'Night' },
+    { id: 'teal',   label: 'Classic' },
+];
+
+const KIND_NAMES = {
+    app: 'Application', doc: 'Rich Text Document', link: 'Internet Shortcut', folder: 'File Folder',
+    video: 'Video Clip', audio: 'Audio Track', about: 'System', bin: 'System Folder',
+};
+
+function writingItems() {
+    return ARTICLES.map(a => ({
+        id: 'art-' + a.slug,
+        label: a.title,
+        icon: 'doc',
+        kind: 'doc',
+        href: `/articles/${a.slug}`,
+        desc: a.blurb,
+        article: a,
+    }));
+}
+
+// ── Markup ───────────────────────────────────────────────────────────
+
+function iconEl(item) {
     return `
-        <a class="ix-row" ${linkAttrs}>
-            <span class="ix-num">${num}</span>
-            <span class="ix-line">
-                <span class="ix-title">${item.title}</span>
-                <span class="ix-desc">${item.desc}</span>
-            </span>
-            <span class="ix-tag">${item.tag}${item.external ? ' ↗' : ''}</span>
-        </a>`;
+    <button class="dt-icon" type="button" data-item="${item.id}" data-tip="${escapeAttr(item.desc || item.label)}">
+        <span class="dt-icon-img">${ICONS[item.icon]}</span>
+        <span class="dt-icon-label">${escapeHtml(item.label)}</span>
+    </button>`;
+}
+
+function menuItem(item) {
+    return `<button class="dt-menu-item" type="button" data-item="${item.id}">
+        <span class="dt-menu-ico">${ICONS[item.icon]}</span><span class="dt-menu-text">${escapeHtml(item.label)}</span>
+    </button>`;
+}
+
+function menuAction(action, icon, label) {
+    return `<button class="dt-menu-item" type="button" data-menu="${action}">
+        <span class="dt-menu-ico">${ICONS[icon]}</span><span class="dt-menu-text">${label}</span>
+    </button>`;
+}
+
+function aboutHtml() {
+    return `
+    <div class="dt-about">
+        <div class="dt-banner"><div class="dt-banner-paper"><canvas id="typeCanvas"></canvas></div></div>
+        <fieldset class="dt-group">
+            <legend>Profile</legend>
+            <table class="dt-kv">
+                <tr><th>name</th><td>Prateek Kumar Gupta</td></tr>
+                <tr><th>does</th><td>software engineer &amp; creative future media practitioner</td></tr>
+                <tr><th>now</th><td>AI &amp; Development at Sum Vivas</td></tr>
+                <tr><th>where</th><td>Manchester, UK</td></tr>
+                <tr><th>builds</th><td>digital humans, small web tools, the occasional cursed snake</td></tr>
+            </table>
+        </fieldset>
+        <fieldset class="dt-group">
+            <legend>Links</legend>
+            <p class="dt-links">
+                <a href="https://www.instagram.com/chai.and.photoshop" target="_blank" rel="noopener">instagram</a> ·
+                <a href="https://www.linkedin.com/in/prateek-gupta08" target="_blank" rel="noopener">linkedin</a> ·
+                <a href="mailto:prateekgupta1198@gmail.com">e-mail</a> ·
+                <a href="https://github.com/prateek-0-gupta" target="_blank" rel="noopener">github</a> ·
+                <a href="https://huggingface.co/prateek-0-gupta" target="_blank" rel="noopener">hugging face</a> ·
+                <a href="https://soundcloud.com/prateek-gupta-505317056" target="_blank" rel="noopener">soundcloud</a>
+            </p>
+        </fieldset>
+        <p class="dt-fine">double-click an icon to open it. drag icons wherever you like; they stay put. right-click for more.</p>
+        <p class="dt-fine">“The best way out is always through.” — Robert Frost</p>
+    </div>`;
+}
+
+function videoHtml(id) {
+    return `<div class="dt-video">
+        <iframe src="https://www.youtube-nocookie.com/embed/${id}?rel=0" title="Digital Doppelgänger"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </div>`;
+}
+
+// the SoundCloud player in a little media-player window
+function audioHtml(item) {
+    const params = new URLSearchParams({
+        url: item.track, color: '#1e90d8', auto_play: 'false', hide_related: 'true',
+        show_comments: 'false', show_user: 'true', show_reposts: 'false', show_teaser: 'false', visual: 'true',
+    });
+    return `<div class="dt-audio">
+        <iframe src="https://w.soundcloud.com/player/?${params}" title="${escapeAttr(item.label)}"
+            allow="autoplay" scrolling="no" frameborder="0"></iframe>
+        <p class="dt-audio-foot"><a href="${item.track}" target="_blank" rel="noopener">open on SoundCloud ↗</a></p>
+    </div>`;
+}
+
+function appHtml(item) {
+    // load the app shell with the route as a query, rather than the deep URL:
+    // a plain static server has no idea what /k/snake means, but /k/?app=/snake
+    // is just index.html, and app.js swaps in the real route before routing
+    const src = './?app=' + encodeURIComponent(item.href);
+    return `<iframe class="dt-app" src="${src}" title="${escapeAttr(item.label)}" loading="lazy"></iframe>`;
+}
+
+// a WordPad-ish document: menu, toolbar, ruler, then the article on a page
+function docHtml(item) {
+    return `
+    <div class="dt-doc">
+        <div class="dt-doc-menu"><span>File</span><span>Edit</span><span>View</span><span>Insert</span><span>Format</span><span>Help</span></div>
+        <div class="dt-doc-tools">
+            <span class="dt-doc-combo dt-doc-font">Inter</span>
+            <span class="dt-doc-combo dt-doc-size">11</span>
+            <span class="dt-doc-sep"></span>
+            <b class="dt-doc-btn">B</b><i class="dt-doc-btn">I</i><u class="dt-doc-btn">U</u>
+            <span class="dt-doc-sep"></span>
+            <span class="dt-doc-btn dt-doc-align is-on">≡</span><span class="dt-doc-btn dt-doc-align">≡</span><span class="dt-doc-btn dt-doc-align">≡</span>
+        </div>
+        <div class="dt-doc-ruler"></div>
+        <div class="dt-doc-page"><article class="art-body">${item.article.html}</article></div>
+    </div>`;
+}
+
+// an Explorer-style folder of thumbnails
+function folderHtml(item, images) {
+    const files = images.map((pic, i) => `
+        <button class="dt-file" type="button" data-index="${i}" data-tip="${escapeAttr(pic.name)}">
+            <span class="dt-file-thumb"><img src="${pic.src}" alt="" loading="lazy" decoding="async"></span>
+            <span class="dt-file-name">${escapeHtml(pic.name)}</span>
+        </button>`).join('');
+    return `
+    <div class="dt-folder">
+        <div class="dt-folder-bar">
+            <span class="dt-folder-nav"><span>◀</span><span>▶</span><span>▲</span></span>
+            <span class="dt-folder-addr-label">Address</span>
+            <span class="dt-folder-addr">${ICONS.folder}<span>C:\\Prateek\\${escapeHtml(item.label)}</span></span>
+        </div>
+        <div class="dt-folder-grid">${files}</div>
+    </div>`;
+}
+
+function viewerHtml() {
+    return `
+    <div class="dt-viewer">
+        <div class="dt-viewer-tools">
+            <button type="button" data-v="prev" data-tip="Previous (←)">◀</button>
+            <span class="dt-viewer-count"></span>
+            <button type="button" data-v="next" data-tip="Next (→)">▶</button>
+            <span class="dt-doc-sep"></span>
+            <button type="button" data-v="fit" class="is-on" data-tip="Fit to window">Fit</button>
+            <button type="button" data-v="actual" data-tip="Actual size">1:1</button>
+            <span class="dt-viewer-name"></span>
+        </div>
+        <div class="dt-viewer-stage"><img alt=""></div>
+        <div class="dt-viewer-cap"></div>
+    </div>`;
+}
+
+function binHtml(binned) {
+    if (!binned.length) {
+        return `<div class="dt-bin-empty">
+            <p>The Recycle Bin is empty.</p>
+            <p class="dt-fine">Nothing here. Some things never were. Drag an icon onto the bin to change that.</p>
+        </div>`;
+    }
+    return `<div class="dt-bin">
+        <div class="dt-bin-list">${binned.map(it => `
+            <div class="dt-bin-row">
+                <span class="dt-bin-ico">${ICONS[it.icon]}</span>
+                <span class="dt-bin-name">${escapeHtml(it.label)}</span>
+                <button type="button" class="dt-btn" data-restore="${it.id}">Restore</button>
+            </div>`).join('')}
+        </div>
+        <div class="dt-bin-foot"><button type="button" class="dt-btn" data-restore="*">Restore all</button></div>
+    </div>`;
+}
+
+function propsHtml(item, type, where) {
+    const link = /^(https?:|mailto:)/.test(where)
+        ? `<a href="${escapeAttr(where)}" target="_blank" rel="noopener">${escapeHtml(where)}</a>`
+        : escapeHtml(where);
+    return `
+    <div class="dt-dialog dt-props">
+        <div class="dt-dialog-body">
+            <div class="dt-props-head">${ICONS[item.icon]}<span class="dt-props-name">${escapeHtml(item.label)}</span></div>
+            <table class="dt-kv">
+                <tr><th>Type</th><td>${type}</td></tr>
+                <tr><th>Location</th><td>${link}</td></tr>
+                <tr><th>Description</th><td>${escapeHtml(item.desc || '—')}</td></tr>
+            </table>
+        </div>
+        <div class="dt-dialog-foot"><button type="button" class="dt-btn is-default" data-act="close">OK</button></div>
+    </div>`;
+}
+
+function displayHtml(current) {
+    return `
+    <div class="dt-dialog dt-display">
+        <div class="dt-monitor"><div class="dt-monitor-screen" data-wall="${current}"></div></div>
+        <div class="dt-walls">${WALLS.map(w => `
+            <button type="button" class="dt-wall${w.id === current ? ' is-on' : ''}" data-wall="${w.id}" data-tip="${w.label}"><span>${w.label}</span></button>`).join('')}
+        </div>
+        <div class="dt-dialog-foot"><button type="button" class="dt-btn is-default" data-act="close">OK</button></div>
+    </div>`;
 }
 
 export default function Home() {
+    const writings = writingItems();
+    const items = [...TOOLS, ...writings, ...SOCIALS, ...LINKS, BIN];
 
-    useEffect(() => {
-        if (_jigsawCleanup) { _jigsawCleanup(); _jigsawCleanup = null; }
-        _jigsawCleanup = initJigsawTypography();
-    }, []);
+    useEffect(() => initDesktop(items, writings), []);
 
-    const writings = ARTICLES.map(a => ({
-        title: a.title,
-        desc: a.blurb,
-        href: `/articles/${a.slug}`,
-        tag: 'writing',
-    }));
-
-    const projectRows = PROJECTS.map(indexRow).join('');
-    const writingRows = writings.map((w, i) => indexRow(w, PROJECTS.length + i)).join('');
-
+    // the whole desktop opts out of DOM morphing: it never re-renders, and
+    // a hash change (a link inside a document) must not wipe open windows
     return `
-    <div class="index-page">
+    <div class="desktop" id="desktop" data-morph-ignore>
+        <div class="dt-icons" id="dt-icons">${items.map(iconEl).join('')}</div>
 
-        <header class="ix-top">
-            <span>prat.ee/k — Manchester, UK</span>
-        </header>
+        <div class="dt-windows" id="dt-windows"></div>
 
-        <main class="ix-main">
-            <section class="ix-intro">
-                <span class="ix-hi">Hi, I am</span>
-                <div class="jigsaw-inline">
-                    <canvas id="typeCanvas"></canvas>
-                </div>
-                <p class="ix-role">
-                    software engineer &amp; creative future media practitioner </br></br>
-                    AI &amp; Development at Sum Vivas.
-                </p>
-                <div class="ix-social">${SOCIALS}</div>
-            </section>
+        <div class="dt-startmenu" id="dt-startmenu" hidden>
+            <div class="dt-menu-side"><span>prat.ee/k</span></div>
+            <div class="dt-menu-list">
+                ${menuItem(TOOLS[0])}
+                <hr>
+                ${TOOLS.slice(1).map(menuItem).join('')}
+                <hr>
+                ${writings.map(menuItem).join('')}
+                <hr>
+                ${LINKS.map(menuItem).join('')}
+                ${SOCIALS.map(menuItem).join('')}
+                <hr>
+                ${menuAction('display', 'display', 'Display Properties…')}
+                ${menuAction('arrange', 'pictures', 'Arrange Icons')}
+                ${menuAction('shutdown', 'power', 'Shut Down…')}
+            </div>
+        </div>
 
-            <section class="ix-list">
-                ${projectRows}
-                <div class="ix-gap"></div>
-                ${writingRows}
-            </section>
-        </main>
+        <div class="dt-taskbar">
+            <button class="dt-start" type="button" id="dt-start" data-tip="Click here to begin">${ICONS.logo}<span>start</span></button>
+            <div class="dt-tasks" id="dt-tasks"></div>
+            <div class="dt-tray">
+                <span class="dt-tray-note">Manchester, UK</span>
+                <span class="dt-clock" id="dt-clock"></span>
+            </div>
+        </div>
 
-        <footer class="ix-foot">
-            <span>© 2026 Prateek Kumar Gupta</span>
-            <span class="ix-note">“The best way out is always through.” — Robert Frost</span>
-        </footer>
+        <div class="dt-ctx" id="dt-ctx" hidden role="menu"></div>
+        <div class="dt-tip" id="dt-tip" hidden role="tooltip"></div>
 
-    </div>
-    `;
+        <div class="dt-off" id="dt-off" hidden>
+            <p>It's now safe to turn off your computer.</p>
+            <p class="dt-off-hint">(click anywhere to turn it back on)</p>
+        </div>
+    </div>`;
 }
 
+// ── Desktop behaviour ────────────────────────────────────────────────
 
+function initDesktop(items, writings) {
+    const desktop = document.getElementById('desktop');
+    if (!desktop) return () => {};
 
+    const byId = Object.fromEntries(items.map(i => [i.id, i]));
+    const iconsRoot = document.getElementById('dt-icons');
+    const winRoot = document.getElementById('dt-windows');
+    const tasks = document.getElementById('dt-tasks');
+    const startBtn = document.getElementById('dt-start');
+    const startMenu = document.getElementById('dt-startmenu');
+    const clock = document.getElementById('dt-clock');
+    const off = document.getElementById('dt-off');
+    const ctx = document.getElementById('dt-ctx');
+    const tip = document.getElementById('dt-tip');
 
-//     TYPOGRAPHY ENGINE
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const small = () => window.innerWidth < 720;
+    const cleanups = [];
+    const on = (el, ev, fn, opts) => { el.addEventListener(ev, fn, opts); cleanups.push(() => el.removeEventListener(ev, fn, opts)); };
+    const store = {
+        get(k, fallback) { try { return JSON.parse(localStorage.getItem(k)) ?? fallback; } catch { return fallback; } },
+        set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode, fine */ } },
+        del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
+    };
 
-const ALPHABET = {
-  A:{o:[0.615,0.024,0.36,0.024,0.054,0.957,0.309,0.957,0.329,0.704,0.628,0.696,0.639,0.943,0.954,0.957,0.615,0.024],h:[[0.398,0.414,0.449,0.15,0.529,0.152,0.578,0.414,0.398,0.414]]},
-  B:{o:[0.956,0.609,0.698,0.5,0.948,0.414,0.969,0.035,0.032,0.035,0.032,0.97,0.956,0.957,0.956,0.609],h:[[0.733,0.095,0.733,0.337,0.268,0.424,0.268,0.127,0.733,0.095],[0.733,0.859,0.268,0.859,0.268,0.632,0.733,0.662,0.733,0.859]]},
-  C:{o:[0.952,0.035,0.036,0.035,0.036,0.97,0.952,0.957,0.819,0.746,0.37,0.694,0.365,0.291,0.864,0.199,0.952,0.035]},
-  D:{o:[0.035,0.035,0.035,0.97,0.954,0.84,0.954,0.212,0.035,0.035],h:[[0.702,0.693,0.382,0.757,0.375,0.254,0.704,0.395,0.702,0.693]]},
-  E:{o:[0.045,0.035,0.045,0.97,0.958,0.97,0.795,0.699,0.303,0.726,0.388,0.56,0.795,0.516,0.798,0.443,0.398,0.404,0.287,0.247,0.795,0.213,0.958,0.035,0.045,0.035]},
-  F:{o:[0.962,0.035,0.033,0.035,0.033,0.97,0.29,0.888,0.293,0.617,0.632,0.606,0.709,0.461,0.307,0.465,0.3,0.234,0.862,0.234,0.962,0.035]},
-  G:{o:[0.954,0.04,0.025,0.04,0.025,0.964,0.954,0.964,0.843,0.5,0.468,0.48,0.488,0.692,0.666,0.695,0.663,0.756,0.212,0.811,0.261,0.263,0.805,0.363,0.954,0.04]},
-  H:{o:[0.032,0.04,0.032,0.964,0.311,0.895,0.239,0.649,0.733,0.621,0.666,0.89,0.969,0.964,0.969,0.04,0.656,0.153,0.733,0.466,0.239,0.5,0.304,0.167,0.032,0.04]},
-  I:{o:[0.036,0.04,0.151,0.268,0.409,0.374,0.409,0.673,0.121,0.792,0.036,0.964,0.952,0.964,0.903,0.79,0.585,0.662,0.592,0.369,0.88,0.241,0.952,0.04,0.036,0.04]},
-  J:{o:[0.035,0.04,0.954,0.04,0.896,0.204,0.591,0.204,0.654,0.946,0.32,0.946,0.293,0.463,0.402,0.463,0.412,0.757,0.524,0.771,0.459,0.217,0.178,0.339,0.035,0.04]},
-  K:{o:[0.045,0.044,0.045,0.974,0.447,0.974,0.447,0.643,0.958,0.946,0.958,0.59,0.482,0.475,0.958,0.396,0.958,0.04,0.444,0.352,0.45,0.044,0.045,0.044]},
-  L:{o:[0.045,0.04,0.045,0.974,0.962,0.962,0.845,0.772,0.378,0.759,0.365,0.11,0.045,0.04]},
-  M:{o:[0.025,0.049,0.025,0.962,0.284,0.878,0.282,0.421,0.412,0.705,0.54,0.541,0.561,0.895,0.954,0.962,0.954,0.071,0.444,0.385,0.025,0.049]},
-  N:{o:[0.032,0.049,0.093,0.962,0.271,0.498,0.862,0.962,0.969,0.085,0.747,0.663,0.032,0.049]},
-  O:{o:[0.036,0.049,0.127,0.962,0.921,0.887,0.952,0.107,0.036,0.049],h:[[0.632,0.647,0.365,0.647,0.365,0.349,0.632,0.349,0.632,0.647]]},
-  P:{o:[0.954,0.049,0.35,0.061,0.035,0.061,0.035,0.966,0.313,0.966,0.31,0.817,0.306,0.665,0.303,0.566,0.619,0.48,0.837,0.42,0.944,0.208,0.954,0.049],h:[[0.273,0.42,0.273,0.244,0.375,0.241,0.5,0.237,0.515,0.275,0.537,0.329,0.425,0.368,0.273,0.42]]},
-  Q:{o:[0.722,0.817,0.958,0.06,0.631,0.077,0.045,0.077,0.064,0.962,0.595,0.891,0.958,0.962,0.958,0.859,0.722,0.817],h:[[0.557,0.62,0.286,0.705,0.252,0.275,0.585,0.275,0.557,0.62]]},
-  R:{o:[0.962,0.133,0.045,0.049,0.045,0.962,0.337,0.962,0.353,0.777,0.724,0.962,0.962,0.755,0.622,0.553,0.962,0.133],h:[[0.278,0.539,0.257,0.25,0.639,0.207,0.278,0.539]]},
-  S:{o:[0.954,0.074,0.025,0.38,0.5,0.733,0.025,0.966,0.954,0.966,0.476,0.402,0.733,0.497,0.954,0.074]},
-  T:{o:[0.044,0.049,0.158,0.372,0.475,0.285,0.36,0.966,0.705,0.966,0.571,0.286,0.907,0.357,0.969,0.049,0.044,0.049]},
-  U:{o:[0.066,0.049,0.066,0.966,0.952,0.932,0.938,0.049,0.658,0.223,0.748,0.729,0.3,0.743,0.378,0.231,0.066,0.049]},
-  V:{o:[0.035,0.049,0.577,0.966,0.954,0.032,0.569,0.175,0.569,0.637,0.246,0.049,0.035,0.049]},
-  W:{o:[0.045,0.032,0.213,0.94,0.501,0.713,0.81,0.929,0.936,0.017,0.045,0.032]},
-  X:{o:[0.675,0.426,0.918,0.577,0.774,0.94,0.523,0.628,0.289,0.94,0.132,0.738,0.379,0.449,0.045,0.032,0.495,0.313,0.726,0.043,0.962,0.043,0.675,0.426]},
-  Y:{o:[0.514,0.491,0.797,0.926,0.687,0.975,0.025,0.225,0.221,0.042,0.471,0.425,0.656,0.07,0.863,0.268,0.514,0.491]},
-  Z:{o:[0.063,0.042,0.131,0.449,0.591,0.206,0.084,0.975,0.934,0.975,0.956,0.298,0.385,0.759,0.956,0.03,0.063,0.042]}
-};
+    const windows = new Map();     // id -> { el, task, item, ... }
+    let z = 10;
+    let cascade = 0;
+    const pointer = { x: 0, y: 0 };
+    on(desktop, 'pointermove', e => { pointer.x = e.clientX; pointer.y = e.clientY; }, { passive: true });
 
-function initJigsawTypography() {
-    const canvas = document.getElementById('typeCanvas');
-    if (!canvas) return () => {};
-    const ctx = canvas.getContext('2d');
-
-    const TEXT = 'PRATEEK';
-    const DISTORTION = 0.2;
-    const GAP = 0.04;
-    const SHADOW_DEPTH = 4;
-    const SPEED_MS = 2000;
-
-    function resizeCanvas() {
-        const container = canvas.parentElement;
-        const dpr = window.devicePixelRatio || 1;
-        const w = container.clientWidth;
-        const h = container.clientHeight;
-        canvas.width = w * dpr;
-        canvas.height = h * dpr;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        generate(true);
-    }
-    window.addEventListener('resize', resizeCanvas);
-
-    let autoTimer = null;
-    function restartTimer() {
-        if (autoTimer) clearInterval(autoTimer);
-        autoTimer = setInterval(() => generate(true), SPEED_MS);
+    // Web Animations helper that respects reduced motion and resolves when done
+    function animate(el, frames, ms, easing = 'cubic-bezier(0.2, 0.8, 0.2, 1)') {
+        if (reduced || !el.animate) return Promise.resolve();
+        return el.animate(frames, { duration: ms, easing }).finished.catch(() => {});
     }
 
-    function random(min, max) { return Math.random() * (max - min) + min; }
-
-    let currentPalette = null;
-
-    // Ink on paper, one blue accent for the offset — constant, only the cut changes
-    function randomMonoPalette() {
-        return {
-            bg: 'transparent',
-            fg: '#1d1a16',
-            shadow: '#2842c8'
-        };
+    // ── Clock ──
+    function tick() {
+        const d = new Date();
+        clock.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        clock.dataset.tip = d.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     }
+    tick();
+    const clockTimer = setInterval(tick, 10000);
+    cleanups.push(() => clearInterval(clockTimer));
 
-    let currentBoundaries = [];
-
-    function mapPoint(u, v, boundsLeft, boundsRight, gap) {
-        u = gap + u * (1 - 2 * gap);
-        v = gap + v * (1 - 2 * gap);
-        const segmentsY = boundsLeft.length - 1;
-        let segmentFloat = v * segmentsY;
-        let idx = Math.floor(segmentFloat);
-        if (idx >= segmentsY) idx = segmentsY - 1;
-        let localV = segmentFloat - idx;
-        let xL = boundsLeft[idx].x + (boundsLeft[idx+1].x - boundsLeft[idx].x) * localV;
-        let yL = boundsLeft[idx].y + (boundsLeft[idx+1].y - boundsLeft[idx].y) * localV;
-        let xR = boundsRight[idx].x + (boundsRight[idx+1].x - boundsRight[idx].x) * localV;
-        let yR = boundsRight[idx].y + (boundsRight[idx+1].y - boundsRight[idx].y) * localV;
-        return { x: xL + (xR - xL) * u, y: yL + (yR - yL) * u };
+    // ── Wallpaper ──
+    function setWall(id) {
+        if (!WALLS.some(w => w.id === id)) id = 'aero';
+        desktop.dataset.wall = id;
+        store.set(WALL_KEY, id);
+        desktop.querySelectorAll('.dt-monitor-screen').forEach(m => { m.dataset.wall = id; });
+        desktop.querySelectorAll('.dt-wall').forEach(b => b.classList.toggle('is-on', b.dataset.wall === id));
     }
+    setWall(store.get(WALL_KEY, 'aero'));
 
-    function generateBoundaries(numLetters, width, height, padding, distortion) {
-        const bounds = [];
-        const segmentsY = 4;
-        const cellWidth = (width - padding * 2) / numLetters;
-        const segH = (height - padding * 2) / segmentsY;
-        for (let i = 0; i <= numLetters; i++) {
-            let columnLine = [];
-            for (let j = 0; j <= segmentsY; j++) {
-                let x = padding + i * cellWidth;
-                let y = padding + j * segH;
-                if (i > 0 && i < numLetters) x += random(-cellWidth * distortion, cellWidth * distortion);
-                y += random(-15, 15);
-                columnLine.push({ x, y });
-            }
-            bounds.push(columnLine);
+    // ── Icon layout: columns for the regulars, random spots for the links, remembered once moved ──
+    const ICON_W = 92, ICON_H = 92, COL = 98, ROW = 98;
+    const area = () => ({ w: desktop.clientWidth, h: desktop.clientHeight - 34 });
+    const iconEls = Object.fromEntries([...desktop.querySelectorAll('.dt-icon')].map(el => [el.dataset.item, el]));
+
+    function defaultLayout() {
+        const a = area();
+        const pos = {};
+        const columns = [TOOLS, writings, SOCIALS];
+        columns.forEach((col, c) => col.forEach((it, r) => { pos[it.id] = { x: 12 + c * COL, y: 12 + r * ROW }; }));
+        pos[BIN.id] = { x: a.w - ICON_W - 12, y: a.h - ICON_H - 12 };
+
+        // scatter the links across the free space, avoiding each other and
+        // the patch where the About window opens
+        const taken = Object.values(pos).map(p => ({ ...p }));
+        for (let x = (a.w - 560) / 2 - 60; x < (a.w + 560) / 2 - 60; x += COL) {
+            for (let y = (a.h - 470) / 2 - 30; y < (a.h + 470) / 2 - 30; y += ROW) taken.push({ x, y });
         }
-        const minGap = cellWidth * 0.08;
-        for (let j = 0; j <= segmentsY; j++) {
-            for (let i = 1; i <= numLetters; i++) {
-                const lo = bounds[i - 1][j].x + minGap;
-                if (bounds[i][j].x < lo) bounds[i][j].x = lo;
-            }
-            for (let i = numLetters - 1; i >= 0; i--) {
-                const hi = bounds[i + 1][j].x - minGap;
-                if (bounds[i][j].x > hi) bounds[i][j].x = hi;
-            }
-        }
-        return bounds;
+        const left = 12 + columns.length * COL + 40;
+        const right = Math.max(left + 40, a.w - ICON_W - 140);
+        const bottom = Math.max(60, a.h - ICON_H - 40);
+        LINKS.forEach(it => {
+            let p, tries = 0;
+            do {
+                p = { x: Math.round(left + Math.random() * (right - left)), y: Math.round(12 + Math.random() * (bottom - 12)) };
+                tries++;
+            } while (tries < 80 && taken.some(t => Math.abs(t.x - p.x) < COL + 8 && Math.abs(t.y - p.y) < ROW + 8));
+            pos[it.id] = p;
+            taken.push(p);
+        });
+        return pos;
     }
 
-    function generate(regenerateGrid = true) {
-        if (regenerateGrid || !currentPalette) {
-            currentPalette = randomMonoPalette();
-            const hero = canvas.parentElement;
-            if (hero) hero.style.backgroundColor = 'transparent';
+    function savePositions() { store.set(STORE_KEY, positions); }
+    function place(id) {
+        const el = iconEls[id], p = positions[id];
+        if (!el || !p) return;
+        const a = area();
+        p.x = clamp(p.x, 0, Math.max(0, a.w - ICON_W));
+        p.y = clamp(p.y, 0, Math.max(0, a.h - ICON_H));
+        el.style.left = p.x + 'px';
+        el.style.top = p.y + 'px';
+    }
+
+    const stored = store.get(STORE_KEY, null);
+    let positions = { ...defaultLayout(), ...(stored || {}) };
+    Object.keys(iconEls).forEach(place);
+    if (!stored) savePositions();          // so the random spots stay where they landed
+
+    function arrangeIcons() {
+        store.del(STORE_KEY);
+        positions = defaultLayout();
+        Object.keys(iconEls).forEach(place);
+        savePositions();
+        restoreItems('*');
+    }
+
+    async function refreshDesktop() {
+        // the pointless-but-satisfying F5: everything blinks once
+        await animate(iconsRoot, [{ opacity: 1 }, { opacity: 0.15 }, { opacity: 1 }], 220, 'ease-in-out');
+    }
+
+    // ── Recycle bin: drag an icon onto it and it goes in; restore from the bin window ──
+    const binned = new Set(store.get(BIN_KEY, []).filter(id => byId[id] && id !== BIN.id));
+    const binWindowRefresh = () => {
+        const rec = windows.get(BIN.id);
+        if (rec) rec.el.querySelector('.win-body').innerHTML = binHtml([...binned].map(id => byId[id]));
+    };
+    function syncBin() {
+        store.set(BIN_KEY, [...binned]);
+        iconEls[BIN.id].querySelector('.dt-icon-img').innerHTML = binned.size ? ICONS.binFull : ICONS.bin;
+        iconEls[BIN.id].dataset.tip = binned.size ? `${binned.size} item${binned.size === 1 ? '' : 's'} inside` : BIN.desc;
+        binWindowRefresh();
+    }
+    binned.forEach(id => iconEls[id].classList.add('is-binned'));
+    syncBin();
+
+    async function binItems(ids) {
+        ids = ids.filter(id => id !== BIN.id && id !== 'about' && iconEls[id] && !binned.has(id));
+        if (!ids.length) return;
+        const target = iconEls[BIN.id].getBoundingClientRect();
+        await Promise.all(ids.map(id => {
+            const el = iconEls[id];
+            const from = el.getBoundingClientRect();
+            const dx = (target.left + target.width / 2) - (from.left + from.width / 2);
+            const dy = (target.top + target.height / 2) - (from.top + from.height / 2);
+            return animate(el, [{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(0.2)`, opacity: 0 }], 260, 'cubic-bezier(0.4, 0, 0.6, 1)');
+        }));
+        ids.forEach(id => { iconEls[id].classList.add('is-binned'); iconEls[id].classList.remove('is-selected'); binned.add(id); });
+        animate(iconEls[BIN.id], [{ transform: 'scale(1.15)' }, { transform: 'none' }], 200);
+        syncBin();
+    }
+    function restoreItems(ids) {
+        const list = ids === '*' ? [...binned] : ids;
+        list.forEach(id => {
+            binned.delete(id);
+            const el = iconEls[id];
+            if (!el) return;
+            el.classList.remove('is-binned');
+            animate(el, [{ transform: 'scale(0.4)', opacity: 0 }, { transform: 'none', opacity: 1 }], 220);
+        });
+        syncBin();
+    }
+    const overBin = (x, y) => {
+        const r = iconEls[BIN.id].getBoundingClientRect();
+        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    };
+
+    // ── Tooltips: anything with data-tip, after a short hover ──
+    let tipTarget = null, tipTimer = null;
+    function showTip(text, x, y) {
+        tip.textContent = text;
+        tip.hidden = false;
+        const d = desktop.getBoundingClientRect();
+        const w = tip.offsetWidth, h = tip.offsetHeight;
+        let left = x - d.left + 12, top = y - d.top + 20;
+        if (left + w > d.width - 8) left = d.width - w - 8;
+        if (top + h > d.height - 40) top = y - d.top - h - 10;
+        tip.style.left = Math.max(4, left) + 'px';
+        tip.style.top = Math.max(4, top) + 'px';
+    }
+    function hideTip() { clearTimeout(tipTimer); tipTimer = null; tipTarget = null; tip.hidden = true; }
+    on(desktop, 'pointerover', e => {
+        if (e.pointerType === 'touch') return;
+        const t = e.target.closest('[data-tip]');
+        if (!t || t === tipTarget) return;
+        hideTip();
+        tipTarget = t;
+        tipTimer = setTimeout(() => { if (tipTarget === t && t.isConnected) showTip(t.dataset.tip, pointer.x, pointer.y); }, 550);
+    });
+    on(desktop, 'pointerout', e => {
+        const t = e.target.closest('[data-tip]');
+        if (t && t === tipTarget && !(e.relatedTarget && t.contains(e.relatedTarget))) hideTip();
+    });
+    on(desktop, 'pointerdown', hideTip, true);
+    on(desktop, 'wheel', hideTip, { passive: true, capture: true });
+
+    // a one-off floating note, used for "Copied"
+    function flash(text) {
+        hideTip();
+        showTip(text, pointer.x, pointer.y);
+        tipTimer = setTimeout(hideTip, 1100);
+    }
+
+    // ── Context menu ──
+    let ctxEntries = [];
+    function showMenu(x, y, entries) {
+        closeStart();
+        hideTip();
+        ctxEntries = entries;
+        ctx.innerHTML = entries.map((e, i) => e === '-' ? '<hr>' : `
+            <button type="button" class="dt-ctx-item${e.bold ? ' is-bold' : ''}${e.disabled ? ' is-disabled' : ''}" data-i="${i}" role="menuitem">
+                <span class="dt-ctx-ico">${e.icon ? ICONS[e.icon] : ''}</span><span>${escapeHtml(e.label)}</span>
+            </button>`).join('');
+        ctx.hidden = false;
+        const d = desktop.getBoundingClientRect();
+        let left = x - d.left, top = y - d.top;
+        if (left + ctx.offsetWidth > d.width - 4) left = Math.max(4, left - ctx.offsetWidth);
+        if (top + ctx.offsetHeight > d.height - 36) top = Math.max(4, top - ctx.offsetHeight);
+        ctx.style.left = left + 'px';
+        ctx.style.top = top + 'px';
+        ctx.querySelector('.dt-ctx-item:not(.is-disabled)')?.focus({ preventScroll: true });
+    }
+    function hideMenu() { ctx.hidden = true; ctxEntries = []; }
+    on(ctx, 'click', e => {
+        const b = e.target.closest('[data-i]');
+        if (!b || b.classList.contains('is-disabled')) return;
+        const entry = ctxEntries[+b.dataset.i];
+        hideMenu();
+        entry?.run?.();
+    });
+    on(desktop, 'pointerdown', e => { if (!e.target.closest('.dt-ctx')) hideMenu(); }, true);
+    on(window, 'blur', hideMenu);
+
+    const siteUrl = href => /^(https?:|mailto:)/.test(href) ? href : location.origin + '/k' + href;
+    const copyText = async text => {
+        try { await navigator.clipboard.writeText(text); flash('Copied'); } catch { flash(text); }
+    };
+
+    function iconMenu(item) {
+        const list = [{ label: 'Open', bold: true, icon: item.icon, run: () => open(item.id) }];
+        if (item.kind === 'app' || item.kind === 'doc') list.push({ label: 'Open full page', run: () => navigate(item.href) });
+        if (item.href) list.push({ label: 'Copy link', run: () => copyText(siteUrl(item.href)) });
+        if (item.track) list.push({ label: 'Copy link', run: () => copyText(item.track) });
+        list.push('-');
+        if (item.id === BIN.id) {
+            list.push({ label: 'Restore all', disabled: !binned.size, run: () => restoreItems('*') });
+        } else if (item.id !== 'about') {
+            const sel = selectedIds().filter(id => id !== BIN.id && id !== 'about');
+            const group = sel.includes(item.id) ? sel : [item.id];
+            list.push({ label: group.length > 1 ? `Delete (${group.length} items)` : 'Delete', run: () => binItems(group) });
         }
+        list.push('-', { label: 'Properties', run: () => openProps(item) });
+        return list;
+    }
+    function desktopMenu() {
+        return [
+            { label: 'Arrange Icons', icon: 'pictures', run: arrangeIcons },
+            { label: 'Refresh', run: refreshDesktop },
+            '-',
+            { label: 'Restore from Recycle Bin', disabled: !binned.size, run: () => restoreItems('*') },
+            { label: 'Display Properties…', icon: 'display', run: openDisplay },
+            '-',
+            { label: 'About Me', icon: 'computer', run: () => open('about') },
+        ];
+    }
+    function windowMenu(rec) {
+        return [
+            { label: 'Restore', disabled: !rec.max && !rec.min, run: () => { if (rec.min) { restore(rec); focus(rec); } else maximise(rec); } },
+            { label: 'Minimise', disabled: rec.min, run: () => minimise(rec) },
+            { label: 'Maximise', disabled: rec.max, run: () => { restore(rec); if (!rec.max) maximise(rec); focus(rec); } },
+            '-',
+            { label: 'Close', bold: true, run: () => close(rec) },
+        ];
+    }
+    function taskbarMenu() {
+        const open = [...windows.values()];
+        return [
+            { label: 'Cascade Windows', disabled: !open.length, run: cascadeWindows },
+            { label: 'Show the Desktop', disabled: !open.some(r => !r.min), run: () => open.forEach(r => minimise(r)) },
+            { label: 'Undo Show the Desktop', disabled: !open.some(r => r.min), run: () => open.forEach(r => { restore(r); }) },
+            '-',
+            { label: 'Display Properties…', icon: 'display', run: openDisplay },
+        ];
+    }
+    function contextFor(target, x, y) {
+        const icon = target.closest('.dt-icon');
+        if (icon) { if (!icon.classList.contains('is-selected')) selectIcon(icon); return iconMenu(byId[icon.dataset.item]); }
+        const title = target.closest('.win-title');
+        if (title) { const rec = windows.get(title.closest('.win').dataset.win); return rec ? windowMenu(rec) : null; }
+        const task = target.closest('.dt-task');
+        if (task) { const rec = [...windows.values()].find(r => r.task === task); return rec ? windowMenu(rec) : null; }
+        if (target.closest('.dt-taskbar')) return taskbarMenu();
+        if (target.closest('.win, .dt-startmenu, .dt-ctx')) return null;
+        selectIcon(null);
+        return desktopMenu();
+    }
+    on(desktop, 'contextmenu', e => {
+        if (e.target.closest('.win-body')) return;          // documents and apps keep the browser's own menu
+        const entries = contextFor(e.target, e.clientX, e.clientY);
+        if (!entries) return;
+        e.preventDefault();
+        showMenu(e.clientX, e.clientY, entries);
+    });
+    // long-press on touch does the same
+    let pressTimer = null;
+    on(desktop, 'pointerdown', e => {
+        if (e.pointerType !== 'touch') return;
+        const target = e.target;
+        pressTimer = setTimeout(() => {
+            const entries = contextFor(target, e.clientX, e.clientY);
+            if (entries) { suppressClick = true; showMenu(e.clientX, e.clientY, entries); }
+        }, 550);
+    });
+    const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; };
+    on(desktop, 'pointerup', cancelPress);
+    on(desktop, 'pointercancel', cancelPress);
+    on(desktop, 'pointermove', e => { if (pressTimer && e.pointerType === 'touch') cancelPress(); });
+    let suppressClick = false;
 
-        const dpr = window.devicePixelRatio || 1;
-        const displayW = canvas.width / dpr;
-        const displayH = canvas.height / dpr;
-        const text = TEXT;
-        const fillColor = currentPalette.fg;
-        const shadowCol = currentPalette.shadow;
-        const PADDING = Math.min(displayW, displayH) * 0.04;
+    // ── Icons: select on click, open on double-click (single tap on touch), drag anywhere ──
+    const selectedIds = () => [...desktop.querySelectorAll('.dt-icon.is-selected')].map(el => el.dataset.item);
+    function selectIcon(el, add = false) {
+        if (!add) desktop.querySelectorAll('.dt-icon.is-selected').forEach(i => { if (i !== el) i.classList.remove('is-selected'); });
+        if (el) el.classList.toggle('is-selected', add ? !el.classList.contains('is-selected') : true);
+    }
 
-        ctx.clearRect(0, 0, displayW, displayH);
+    let lastPointer = coarse ? 'touch' : 'mouse';
+    on(desktop, 'pointerdown', e => { lastPointer = e.pointerType || lastPointer; }, true);
 
-        if (regenerateGrid || currentBoundaries.length !== text.length + 1) {
-            currentBoundaries = generateBoundaries(text.length, displayW, displayH, PADDING, DISTORTION);
+    let skipClear = false;                     // set by a marquee so its pointerup click keeps the selection
+    on(desktop, 'click', e => {
+        if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); return; }
+        const icon = e.target.closest('.dt-icon');
+        if (icon) {
+            if (icon.dataset.dragged) { delete icon.dataset.dragged; return; }
+            selectIcon(icon, e.ctrlKey || e.metaKey);
+            if (lastPointer === 'touch' || lastPointer === 'pen') open(icon.dataset.item);
+            return;
         }
+        if (skipClear) { skipClear = false; return; }
+        if (!e.target.closest('.win, .dt-taskbar, .dt-startmenu, .dt-ctx')) selectIcon(null);
+        if (!e.target.closest('.dt-startmenu, #dt-start')) closeStart();
+    });
+    on(desktop, 'dblclick', e => {
+        const icon = e.target.closest('.dt-icon');
+        if (icon) open(icon.dataset.item);
+    });
+    on(desktop, 'keydown', e => {
+        if (e.key === 'Escape') { closeStart(); hideMenu(); return; }
+        const icon = e.target.closest('.dt-icon');
+        if (!icon) return;
+        if (e.key === 'Enter') open(icon.dataset.item);
+        if (e.key === 'Delete') binItems(selectedIds().length ? selectedIds() : [icon.dataset.item]);
+    });
 
-        for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-            const letterData = ALPHABET[char];
-            if (!letterData || !letterData.o || letterData.o.length === 0) continue;
-
-            const bL = currentBoundaries[i];
-            const bR = currentBoundaries[i + 1];
-
-            ctx.beginPath();
-            for (let j = 0; j < letterData.o.length; j += 2) {
-                let pt = mapPoint(letterData.o[j], letterData.o[j+1], bL, bR, GAP);
-                if (j === 0) ctx.moveTo(pt.x, pt.y);
-                else ctx.lineTo(pt.x, pt.y);
-            }
-            ctx.closePath();
-
-            if (letterData.h) {
-                for (let h = 0; h < letterData.h.length; h++) {
-                    const hole = letterData.h[h];
-                    for (let j = 0; j < hole.length; j += 2) {
-                        let pt = mapPoint(hole[j], hole[j+1], bL, bR, GAP);
-                        if (j === 0) ctx.moveTo(pt.x, pt.y);
-                        else ctx.lineTo(pt.x, pt.y);
-                    }
-                    ctx.closePath();
+    // dragging one selected icon drags the whole selection; drop on the bin to delete
+    Object.entries(iconEls).forEach(([id, icon]) => {
+        let group = [], starts = {};
+        drag(icon, {
+            start() {
+                if (small()) return false;
+                if (!icon.classList.contains('is-selected')) selectIcon(icon);
+                group = selectedIds();
+                starts = Object.fromEntries(group.map(g => [g, { ...positions[g] }]));
+            },
+            move(dx, dy) {
+                group.forEach(g => { positions[g] = { x: starts[g].x + dx, y: starts[g].y + dy }; place(g); });
+                if (id !== BIN.id) iconEls[BIN.id].classList.toggle('is-drop', overBin(pointer.x, pointer.y));
+            },
+            end(moved) {
+                iconEls[BIN.id].classList.remove('is-drop');
+                if (!moved) return;
+                icon.dataset.dragged = '1';
+                if (id !== BIN.id && overBin(pointer.x, pointer.y)) {
+                    group.forEach(g => { positions[g] = starts[g]; place(g); });
+                    binItems(group);
+                } else {
+                    savePositions();
                 }
-            }
+            },
+        });
+    });
 
-            ctx.fillStyle = fillColor;
-            ctx.shadowColor = shadowCol;
-            ctx.shadowOffsetX = SHADOW_DEPTH;
-            ctx.shadowOffsetY = SHADOW_DEPTH;
-            ctx.shadowBlur = 0;
-            ctx.fill('evenodd');
+    // rubber-band selection on the empty desktop
+    const marquee = document.createElement('div');
+    marquee.className = 'dt-marquee';
+    marquee.hidden = true;
+    iconsRoot.appendChild(marquee);
+    {
+        let sx = 0, sy = 0, active = false, moved = false;
+        const d = () => desktop.getBoundingClientRect();
+        on(iconsRoot, 'pointerdown', e => {
+            if (e.target !== iconsRoot || e.button !== 0 || small()) return;
+            active = true; moved = false; sx = e.clientX; sy = e.clientY;
+            iconsRoot.setPointerCapture?.(e.pointerId);
+        });
+        on(iconsRoot, 'pointermove', e => {
+            if (!active) return;
+            const x1 = Math.min(sx, e.clientX), y1 = Math.min(sy, e.clientY), x2 = Math.max(sx, e.clientX), y2 = Math.max(sy, e.clientY);
+            if (!moved && Math.hypot(x2 - x1, y2 - y1) < 4) return;
+            moved = true;
+            const b = d();
+            marquee.hidden = false;
+            Object.assign(marquee.style, { left: x1 - b.left + 'px', top: y1 - b.top + 'px', width: x2 - x1 + 'px', height: y2 - y1 + 'px' });
+            Object.values(iconEls).forEach(el => {
+                if (el.classList.contains('is-binned')) return;
+                const r = el.getBoundingClientRect();
+                el.classList.toggle('is-selected', r.left < x2 && r.right > x1 && r.top < y2 && r.bottom > y1);
+            });
+        });
+        const stop = e => {
+            if (!active) return;
+            active = false;
+            marquee.hidden = true;
+            iconsRoot.releasePointerCapture?.(e.pointerId);
+            if (moved) skipClear = true;
+        };
+        on(iconsRoot, 'pointerup', stop);
+        on(iconsRoot, 'pointercancel', stop);
+    }
 
-            ctx.shadowColor = 'transparent';
-            ctx.strokeStyle = shadowCol;
-            ctx.lineWidth = 2.5;
-            ctx.stroke();
+    // ── Start menu ──
+    function openStart() { hideMenu(); startMenu.hidden = false; startBtn.classList.add('is-down'); }
+    function closeStart() { startMenu.hidden = true; startBtn.classList.remove('is-down'); }
+    on(startBtn, 'click', () => (startMenu.hidden ? openStart() : closeStart()));
+    on(startMenu, 'click', e => {
+        const item = e.target.closest('[data-item]');
+        if (item) { closeStart(); open(item.dataset.item); return; }
+        const action = e.target.closest('[data-menu]');
+        if (!action) return;
+        closeStart();
+        if (action.dataset.menu === 'shutdown') shutDown();
+        if (action.dataset.menu === 'arrange') arrangeIcons();
+        if (action.dataset.menu === 'display') openDisplay();
+    });
+
+    function shutDown() {
+        off.hidden = false;
+        const back = () => { off.hidden = true; off.removeEventListener('click', back); };
+        off.addEventListener('click', back);
+    }
+
+    // ── Opening things ──
+    function open(id) {
+        const item = byId[id];
+        if (!item) return;
+        const el = iconEls[id];
+        if (el) animate(el.querySelector('.dt-icon-img'), [{ transform: 'scale(1)' }, { transform: 'scale(1.18)' }, { transform: 'scale(1)' }], 220);
+        switch (item.kind) {
+            case 'link':    window.open(item.href, '_blank', 'noopener'); break;
+            case 'page':    navigate(item.href); break;
+            case 'about':   openWindow(item, { body: aboutHtml(), w: 560, h: 470, jigsaw: true }); break;
+            case 'video':   openWindow(item, { body: videoHtml(item.video), w: 800, h: 480, cls: 'is-video' }); break;
+            case 'audio':   openWindow(item, { body: audioHtml(item), w: 520, h: 420, cls: 'is-audio' }); break;
+            case 'bin':     openBin(); break;
+            case 'app':     openWindow(item, { body: appHtml(item), w: 980, h: 640, cls: 'is-app', full: item.href }); break;
+            case 'doc':     openDoc(item); break;
+            case 'folder':  openFolder(item, POSTERS.map(p => ({ src: `${POSTER_DIR}/${p.file}`, name: p.file }))); break;
         }
     }
 
-    canvas.addEventListener('click', () => generate(true));
+    function openBin() {
+        if (windows.has(BIN.id)) { openWindow(BIN, {}); return; }
+        const rec = openWindow(BIN, { body: binHtml([...binned].map(id => byId[id])), w: 420, h: 300 });
+        rec.el.querySelector('.win-body').addEventListener('click', e => {
+            const b = e.target.closest('[data-restore]');
+            if (b) restoreItems(b.dataset.restore === '*' ? '*' : [b.dataset.restore]);
+        });
+    }
 
-    // Boot
-    resizeCanvas();
-    restartTimer();
+    function openProps(item) {
+        const type = KIND_NAMES[item.kind] || 'File';
+        const where = item.href ? siteUrl(item.href) : item.track || `C:\\Prateek\\${item.label}`;
+        openWindow({ id: 'props-' + item.id, label: `${item.label} Properties`, icon: item.icon, desc: type },
+            { body: propsHtml(item, type, where), w: 400, h: 320, cls: 'is-dialog' });
+    }
+
+    function openDisplay() {
+        const item = { id: 'display', label: 'Display Properties', icon: 'display', desc: 'pick a wallpaper' };
+        if (windows.has(item.id)) { openWindow(item, {}); return; }
+        const rec = openWindow(item, { body: displayHtml(desktop.dataset.wall), w: 320, h: 330, cls: 'is-dialog' });
+        rec.el.querySelector('.dt-walls').addEventListener('click', e => {
+            const b = e.target.closest('[data-wall]');
+            if (b) setWall(b.dataset.wall);
+        });
+    }
+
+    function openDoc(item) {
+        if (windows.has(item.id)) { openWindow(item, {}); return; }
+        const rec = openWindow(item, { body: docHtml(item), w: 860, h: 640, cls: 'is-doc', full: item.href, icon: 'wordpad' });
+        const page = rec.el.querySelector('.dt-doc-page');
+        // links inside the document stay inside the desktop: other articles
+        // open as documents, contents links scroll the page, pictures open
+        // in the viewer. stopPropagation keeps the router's body handler out.
+        page.addEventListener('click', e => {
+            const a = e.target.closest('a');
+            if (a) {
+                const href = a.getAttribute('href') || '';
+                if (href.startsWith('#')) {
+                    e.preventDefault(); e.stopPropagation();
+                    const target = page.querySelector(`[id="${CSS.escape(href.slice(1))}"]`);
+                    if (target) target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+                    return;
+                }
+                const m = href.match(/^\/articles\/([^/?#]+)/);
+                if (m && byId['art-' + m[1]]) {
+                    e.preventDefault(); e.stopPropagation();
+                    open('art-' + m[1]);
+                }
+                return;
+            }
+            const img = e.target.closest('img');
+            if (img && !img.closest('a')) {
+                const all = [...page.querySelectorAll('img')].filter(i => !i.closest('.art-fig-pending'));
+                const list = all.map(i => ({
+                    src: i.currentSrc || i.src,
+                    name: i.alt || i.src.split('/').pop(),
+                    caption: i.closest('figure')?.querySelector('figcaption')?.textContent.trim() || '',
+                }));
+                openViewer(list, Math.max(0, all.indexOf(img)), item.label);
+            }
+        });
+    }
+
+    // ── Folder: a grid of thumbnails; double-click (tap on touch) opens a picture ──
+    function openFolder(item, images) {
+        if (windows.has(item.id)) { openWindow(item, {}); return; }
+        const rec = openWindow(item, { body: folderHtml(item, images), w: 900, h: 620, cls: 'is-folder', icon: 'folder' });
+        const status = rec.el.querySelector('.win-status span');
+        status.textContent = `${images.length} objects`;
+        const grid = rec.el.querySelector('.dt-folder-grid');
+        const select = el => {
+            grid.querySelectorAll('.dt-file.is-selected').forEach(f => f.classList.remove('is-selected'));
+            if (el) el.classList.add('is-selected');
+            status.textContent = el ? `${el.dataset.tip} — ${images.length} objects` : `${images.length} objects`;
+        };
+        const openAt = el => openViewer(images, +el.dataset.index, item.label);
+        grid.addEventListener('click', e => {
+            const f = e.target.closest('.dt-file');
+            select(f);
+            if (f && (lastPointer === 'touch' || lastPointer === 'pen')) openAt(f);
+        });
+        grid.addEventListener('dblclick', e => { const f = e.target.closest('.dt-file'); if (f) openAt(f); });
+        grid.addEventListener('keydown', e => { const f = e.target.closest('.dt-file'); if (f && e.key === 'Enter') openAt(f); });
+    }
+
+    // ── Image viewer: a fresh window each time, fed a list of pictures and an index ──
+    let viewerCount = 0;
+    function openViewer(images, index, source) {
+        const item = { id: 'viewer-' + (++viewerCount), label: 'Image Viewer', icon: 'viewer', desc: source };
+        const rec = openWindow(item, { body: viewerHtml(), w: 900, h: 640, cls: 'is-viewer' });
+        rec.el.querySelector('.dt-viewer-tools').addEventListener('click', e => {
+            const b = e.target.closest('[data-v]');
+            if (!b) return;
+            const v = b.dataset.v;
+            if (v === 'prev') step(rec, -1);
+            else if (v === 'next') step(rec, 1);
+            else setZoom(rec, v === 'actual');
+        });
+        rec.el.querySelector('.dt-viewer-stage').addEventListener('dblclick', () => setZoom(rec, !rec.actual));
+        rec.images = images;
+        rec.index = clamp(index, 0, images.length - 1);
+        rec.source = source;
+        rec.el.querySelector('.win-status span').textContent = source;
+        showImage(rec);
+    }
+    function step(rec, d) {
+        if (!rec.images.length) return;
+        rec.index = (rec.index + d + rec.images.length) % rec.images.length;
+        showImage(rec);
+    }
+    function setZoom(rec, actual) {
+        rec.actual = actual;
+        rec.el.querySelector('.dt-viewer-stage').classList.toggle('is-actual', actual);
+        rec.el.querySelector('[data-v="fit"]').classList.toggle('is-on', !actual);
+        rec.el.querySelector('[data-v="actual"]').classList.toggle('is-on', actual);
+    }
+    function showImage(rec) {
+        const pic = rec.images[rec.index];
+        if (!pic) return;
+        const img = rec.el.querySelector('.dt-viewer-stage img');
+        img.src = pic.src;
+        img.alt = pic.name || '';
+        animate(img, [{ opacity: 0.4 }, { opacity: 1 }], 160, 'ease-out');
+        rec.el.querySelector('.dt-viewer-count').textContent = `${rec.index + 1} / ${rec.images.length}`;
+        rec.el.querySelector('.dt-viewer-name').textContent = pic.name || '';
+        rec.el.querySelector('.dt-viewer-cap').textContent = pic.caption || '';
+        rec.el.querySelector('.win-name').textContent = `${pic.name || 'Image'} — Image Viewer`;
+        rec.task.querySelector('span:last-child').textContent = `${pic.name || 'Image'} — Image Viewer`;
+        rec.task.dataset.tip = `${pic.name || 'Image'} — Image Viewer`;
+        // preload the neighbours so paging feels instant
+        [1, -1].forEach(d => { const n = rec.images[(rec.index + d + rec.images.length) % rec.images.length]; if (n) new Image().src = n.src; });
+    }
+    on(document, 'keydown', e => {
+        const rec = [...windows.values()].find(r => r.images && !r.min && r.el.classList.contains('is-active'));
+        if (!rec) return;
+        if (e.key === 'ArrowLeft') step(rec, -1);
+        if (e.key === 'ArrowRight') step(rec, 1);
+    });
+
+    // ── Windows ──
+    function openWindow(item, opts) {
+        const existing = windows.get(item.id);
+        if (existing) { restore(existing); focus(existing); return existing; }
+
+        const icon = opts.icon || item.icon;
+        const el = document.createElement('section');
+        el.className = 'win' + (opts.cls ? ' ' + opts.cls : '');
+        el.setAttribute('role', 'dialog');
+        el.setAttribute('aria-label', item.label);
+        el.dataset.win = item.id;
+        el.innerHTML = `
+            <header class="win-title">
+                <span class="win-ico">${ICONS[icon]}</span>
+                <span class="win-name">${escapeHtml(item.label)}</span>
+                <span class="win-btns">
+                    <button type="button" data-act="min" aria-label="Minimise" data-tip="Minimise">_</button>
+                    <button type="button" data-act="max" aria-label="Maximise" data-tip="Maximise">□</button>
+                    <button type="button" data-act="close" aria-label="Close" data-tip="Close">✕</button>
+                </span>
+            </header>
+            <div class="win-body">${opts.body}</div>
+            <footer class="win-status">
+                <span>${escapeHtml(item.desc || item.label)}</span>
+                ${opts.full ? `<a href="${opts.full}" data-link data-tip="Leave the desktop and open this on its own page">open full page ↗</a>` : ''}
+            </footer>
+            <span class="win-resize" aria-hidden="true" data-tip="Drag to resize"></span>`;
+
+        // size and position, cascaded, clamped to the desktop
+        const a = area();
+        const w = Math.min(opts.w, a.w - 24);
+        const h = Math.min(opts.h, a.h - 50);
+        const stepPx = 28 * (cascade++ % 6);
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        el.style.left = Math.max(8, (a.w - w) / 2 + stepPx - 60) + 'px';
+        el.style.top = Math.max(8, (a.h - h) / 2 - 30 + stepPx) + 'px';
+
+        const task = document.createElement('button');
+        task.type = 'button';
+        task.className = 'dt-task';
+        task.dataset.tip = item.label;
+        task.innerHTML = `<span class="dt-task-ico">${ICONS[icon]}</span><span>${escapeHtml(item.label)}</span>`;
+        tasks.appendChild(task);
+        animate(task, [{ transform: 'translateY(6px)', opacity: 0 }, { transform: 'none', opacity: 1 }], 160);
+
+        const rec = { el, task, item, jigsaw: null, min: false, max: false, rect: null };
+        windows.set(item.id, rec);
+        winRoot.appendChild(el);
+        animate(el, [{ transform: 'scale(0.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], 170);
+
+        if (small()) maximise(rec, true);
+
+        drag(el.querySelector('.win-title'), {
+            start() { if (rec.max) return false; focus(rec); rec.rect = { x: el.offsetLeft, y: el.offsetTop }; },
+            move(dx, dy) {
+                const b = area();
+                el.style.left = clamp(rec.rect.x + dx, -w + 80, b.w - 80) + 'px';
+                el.style.top = clamp(rec.rect.y + dy, 0, b.h - 40) + 'px';
+            },
+        });
+        drag(el.querySelector('.win-resize'), {
+            start() { if (rec.max) return false; focus(rec); rec.rect = { w: el.offsetWidth, h: el.offsetHeight }; },
+            move(dx, dy) {
+                el.style.width = Math.max(260, rec.rect.w + dx) + 'px';
+                el.style.height = Math.max(160, rec.rect.h + dy) + 'px';
+            },
+        });
+
+        el.addEventListener('pointerdown', () => focus(rec));
+        el.querySelector('.win-title').addEventListener('dblclick', e => {
+            if (!e.target.closest('button')) maximise(rec);
+        });
+        el.addEventListener('click', e => {
+            const btn = e.target.closest('[data-act]');
+            if (!btn) return;
+            const act = btn.dataset.act;
+            if (act === 'close') close(rec);
+            else if (act === 'min') minimise(rec);
+            else if (act === 'max') maximise(rec);
+        });
+        task.addEventListener('click', () => {
+            if (rec.min) { restore(rec); focus(rec); }
+            else if (rec.el.classList.contains('is-active')) minimise(rec);
+            else focus(rec);
+        });
+
+        focus(rec);
+        if (opts.jigsaw) rec.jigsaw = initJigsawTypography();
+        return rec;
+    }
+
+    function focus(rec) {
+        windows.forEach(r => { r.el.classList.remove('is-active'); r.task.classList.remove('is-active'); });
+        rec.el.classList.add('is-active');
+        rec.task.classList.add('is-active');
+        rec.el.style.zIndex = ++z;
+    }
+    // minimise flies the window into its taskbar button; restore flies it back
+    function taskDelta(rec) {
+        const from = rec.el.getBoundingClientRect(), to = rec.task.getBoundingClientRect();
+        return { dx: (to.left + to.width / 2) - (from.left + from.width / 2), dy: (to.top + to.height / 2) - (from.top + from.height / 2) };
+    }
+    function minimise(rec) {
+        if (rec.min) return;
+        rec.min = true;
+        rec.el.classList.remove('is-active');
+        rec.task.classList.remove('is-active');
+        const { dx, dy } = taskDelta(rec);
+        animate(rec.el, [{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(0.05)`, opacity: 0 }], 230, 'cubic-bezier(0.4, 0, 0.6, 1)')
+            .then(() => { if (rec.min) rec.el.classList.add('is-min'); });
+        const last = [...windows.values()].filter(r => !r.min).pop();
+        if (last) focus(last);
+    }
+    function restore(rec) {
+        if (!rec.min) return;
+        rec.min = false;
+        rec.el.classList.remove('is-min');
+        const { dx, dy } = taskDelta(rec);
+        animate(rec.el, [{ transform: `translate(${dx}px, ${dy}px) scale(0.05)`, opacity: 0 }, { transform: 'none', opacity: 1 }], 230);
+    }
+    function maximise(rec, force) {
+        const before = rec.el.getBoundingClientRect();
+        rec.max = force ? true : !rec.max;
+        rec.el.classList.toggle('is-max', rec.max);
+        if (!force && !reduced) {
+            // FLIP: play the jump from the old box to the new one
+            const after = rec.el.getBoundingClientRect();
+            const sx = before.width / after.width, sy = before.height / after.height;
+            animate(rec.el, [
+                { transformOrigin: '0 0', transform: `translate(${before.left - after.left}px, ${before.top - after.top}px) scale(${sx}, ${sy})` },
+                { transformOrigin: '0 0', transform: 'none' },
+            ], 200, 'ease-out');
+        }
+        if (rec.jigsaw) window.dispatchEvent(new Event('resize'));
+    }
+    function close(rec) {
+        if (rec.jigsaw) rec.jigsaw();
+        windows.delete(rec.item.id);
+        rec.el.classList.remove('is-active');
+        animate(rec.task, [{ transform: 'none', opacity: 1 }, { transform: 'translateY(6px)', opacity: 0 }], 140).then(() => rec.task.remove());
+        animate(rec.el, [{ transform: 'none', opacity: 1 }, { transform: 'scale(0.94)', opacity: 0 }], 140, 'ease-in').then(() => rec.el.remove());
+        const last = [...windows.values()].filter(r => !r.min).pop();
+        if (last) focus(last);
+    }
+    function cascadeWindows() {
+        let i = 0;
+        windows.forEach(rec => {
+            restore(rec);
+            if (rec.max) maximise(rec);
+            const before = rec.el.getBoundingClientRect();
+            rec.el.style.left = 24 + 28 * i + 'px';
+            rec.el.style.top = 24 + 28 * i + 'px';
+            const after = rec.el.getBoundingClientRect();
+            animate(rec.el, [{ transform: `translate(${before.left - after.left}px, ${before.top - after.top}px)` }, { transform: 'none' }], 220);
+            focus(rec);
+            i++;
+        });
+    }
+
+    // ── Pointer drag helper. move() gets deltas; start() may return false to refuse. ──
+    function drag(handle, { start, move, end }) {
+        let sx = 0, sy = 0, active = false, moved = false;
+        const onMove = e => {
+            if (!active) return;
+            const dx = e.clientX - sx, dy = e.clientY - sy;
+            if (!moved && Math.hypot(dx, dy) < 4) return;
+            moved = true;
+            move(dx, dy);
+        };
+        const onUp = e => {
+            if (!active) return;
+            active = false;
+            desktop.classList.remove('is-dragging');
+            handle.releasePointerCapture?.(e.pointerId);
+            if (end) end(moved);
+        };
+        handle.addEventListener('pointerdown', e => {
+            if (e.button !== 0) return;
+            const control = e.target.closest('button, a, iframe');
+            if (control && control !== handle) return;     // a button inside the handle, not the handle itself
+            if (start && start() === false) return;
+            active = true; moved = false; sx = e.clientX; sy = e.clientY;
+            desktop.classList.add('is-dragging');    // iframes stop eating pointer events
+            handle.setPointerCapture?.(e.pointerId);
+        });
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onUp);
+    }
+
+    // a phone-sized viewport gets every window full-screen; otherwise keep icons on screen
+    on(window, 'resize', () => {
+        hideMenu(); hideTip();
+        if (small()) windows.forEach(r => { if (!r.max) maximise(r, true); });
+        else Object.keys(iconEls).forEach(place);
+    });
+
+    // open the About window on arrival, like a login greeting
+    const greet = setTimeout(() => open('about'), 150);
+    cleanups.push(() => clearTimeout(greet));
 
     return function cleanup() {
-        window.removeEventListener('resize', resizeCanvas);
-        if (autoTimer) clearInterval(autoTimer);
+        windows.forEach(r => { if (r.jigsaw) r.jigsaw(); });
+        windows.clear();
+        clearTimeout(tipTimer);
+        clearTimeout(pressTimer);
+        cleanups.forEach(fn => fn());
     };
 }
+
+// ── Utils ────────────────────────────────────────────────────────────
+
+function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }

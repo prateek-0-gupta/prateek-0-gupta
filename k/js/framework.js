@@ -135,7 +135,8 @@ function morphNode(parent, oldNode, newNode) {
             parent.replaceChild(newNode.cloneNode(true), oldNode);
             return;
         }
-        if (oldNode.hasAttribute('data-morph-ignore')) return;
+        // only when both sides opt out: a page change must still replace it
+        if (oldNode.hasAttribute('data-morph-ignore') && newNode.hasAttribute('data-morph-ignore')) return;
         morphAttributes(oldNode, newNode);
         morphChildren(oldNode, newNode);
     }

@@ -2,10 +2,12 @@
 // Media lives in js/pages/articles/assets/ — all resolved against <base href="/k/">.
 
 import { AI_IN_CINEMA } from './ai-in-cinema/ai-in-cinema.js';
+import { AITOY } from './aitoy/aitoy.js';
 
 const A = 'js/pages/articles/assets';
 
 export const ARTICLES = [
+    AITOY,
     AI_IN_CINEMA,
     {
         slug: 'evolution-of-ai-in-media',

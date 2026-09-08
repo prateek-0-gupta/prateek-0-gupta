@@ -31,4 +31,9 @@ const routes = {
     '*': NotFound,
 };
 
+// A tool opened in a window on the desktop loads this shell as /k/?app=/route,
+// so any static server can serve it. Swap in the real route before routing.
+const embedded = new URLSearchParams(location.search).get('app');
+if (embedded && /^\/[\w-]+$/.test(embedded)) history.replaceState(null, '', '/k' + embedded);
+
 const app = new Framework(routes, '/k');

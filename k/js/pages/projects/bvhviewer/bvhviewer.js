@@ -6,12 +6,16 @@ export default function BVHViewer() {
 
     useEffect(() => {
         if (_cleanup) { _cleanup(); _cleanup = null; }
+        let gone = false;
         const init = async () => {
             const container = document.getElementById('bvh-canvas-wrap');
             if (!container) return;
-            _cleanup = await initBVHScene(container);
+            const cleanup = await initBVHScene(container);
+            if (gone) { if (cleanup) cleanup(); return; }   // page left while loading
+            _cleanup = cleanup;
         };
         init();
+        return () => { gone = true; if (_cleanup) { _cleanup(); _cleanup = null; } };
     }, []);
 
     registerHandler('bvh-upload', () => {
