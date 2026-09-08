@@ -8,6 +8,8 @@ import { ARTICLES } from './articles/articles-data.js';
 import { POSTERS } from '../poster-manifest.js';
 import { initJigsawTypography } from '../components/jigsaw.js';
 import { ICONS } from '../components/desktop-icons.js';
+import { createSfx } from '../components/sfx.js';
+import { ARROW, BUSY } from '../components/cursors.js';
 
 // ── Content ──────────────────────────────────────────────────────────
 
@@ -15,6 +17,18 @@ const POSTER_DIR = 'js/pages/projects/posters/assets';
 const STORE_KEY = 'prateek-desktop-icons-v1';
 const BIN_KEY = 'prateek-desktop-bin-v1';
 const WALL_KEY = 'prateek-desktop-wall-v1';
+const SOUND_KEY = 'prateek-desktop-sound-v1';
+const BOOT_KEY = 'prateek-desktop-booted';     // sessionStorage: once per visit
+
+const BOOT_LINES = [
+    'prat.ee BIOS v2.6  (c) 2026 Prateek Kumar Gupta',
+    'CPU: two cores, overclocked by enthusiasm',
+    'Memory Test: 8192MB ........ OK',
+    'Detecting drives',
+    '  C: prat.ee/k',
+    '  D: side projects (some deceased)',
+    'Loading desktop ...',
+];
 
 const TOOLS = [
     { id: 'about',   label: 'About Me',                 icon: 'computer', kind: 'about', desc: 'prat.ee/k — Manchester, UK' },
@@ -253,13 +267,24 @@ function displayHtml(current) {
 export default function Home() {
     const writings = writingItems();
     const items = [...TOOLS, ...writings, ...SOCIALS, ...LINKS, BIN];
+    let booted = true;
+    try { booted = !!sessionStorage.getItem(BOOT_KEY); } catch { /* fine */ }
 
     useEffect(() => initDesktop(items, writings), []);
 
     // the whole desktop opts out of DOM morphing: it never re-renders, and
     // a hash change (a link inside a document) must not wipe open windows
     return `
-    <div class="desktop" id="desktop" data-morph-ignore>
+    <div class="desktop${booted ? '' : ' is-booting'}" id="desktop" data-morph-ignore>
+        <div class="dt-boot" id="dt-boot"${booted ? ' hidden' : ''}>
+            <pre class="dt-boot-post" id="dt-boot-post"></pre>
+            <div class="dt-boot-logo" id="dt-boot-logo" hidden>
+                <div class="dt-boot-word">prat.ee<span>/k</span></div>
+                <div class="dt-boot-bar"><i></i><i></i><i></i></div>
+                <div class="dt-boot-hint">click to skip</div>
+            </div>
+        </div>
+        <div class="dt-snap" id="dt-snap" hidden></div>
         <div class="dt-icons" id="dt-icons">${items.map(iconEl).join('')}</div>
 
         <div class="dt-windows" id="dt-windows"></div>
@@ -287,8 +312,18 @@ export default function Home() {
             <div class="dt-tasks" id="dt-tasks"></div>
             <div class="dt-tray">
                 <span class="dt-tray-note">Manchester, UK</span>
-                <span class="dt-clock" id="dt-clock"></span>
+                <button class="dt-tray-btn" type="button" id="dt-sound" data-tip="Sounds are off" aria-pressed="false">${ICONS.speakerOff}</button>
+                <button class="dt-clock" type="button" id="dt-clock" data-tip=""></button>
             </div>
+        </div>
+
+        <div class="dt-cal" id="dt-cal" hidden>
+            <div class="dt-cal-head">
+                <button type="button" data-cal="-1" aria-label="Previous month">◀</button>
+                <span class="dt-cal-title" id="dt-cal-title"></span>
+                <button type="button" data-cal="1" aria-label="Next month">▶</button>
+            </div>
+            <div class="dt-cal-grid" id="dt-cal-grid"></div>
         </div>
 
         <div class="dt-ctx" id="dt-ctx" hidden role="menu"></div>
@@ -317,6 +352,10 @@ function initDesktop(items, writings) {
     const off = document.getElementById('dt-off');
     const ctx = document.getElementById('dt-ctx');
     const tip = document.getElementById('dt-tip');
+    const boot = document.getElementById('dt-boot');
+    const snap = document.getElementById('dt-snap');
+    const cal = document.getElementById('dt-cal');
+    const soundBtn = document.getElementById('dt-sound');
 
     const coarse = window.matchMedia('(pointer: coarse)').matches;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -340,6 +379,134 @@ function initDesktop(items, writings) {
         if (reduced || !el.animate) return Promise.resolve();
         return el.animate(frames, { duration: ms, easing }).finished.catch(() => {});
     }
+
+    // ── Sounds: off by default, the speaker in the tray turns them on ──
+    const sfx = createSfx();
+    let chimed = false;
+    function setSound(onNow) {
+        sfx.enabled = onNow;
+        store.set(SOUND_KEY, onNow);
+        soundBtn.innerHTML = onNow ? ICONS.speaker : ICONS.speakerOff;
+        soundBtn.dataset.tip = onNow ? 'Sounds are on' : 'Sounds are off';
+        soundBtn.setAttribute('aria-pressed', String(onNow));
+    }
+    setSound(store.get(SOUND_KEY, false));
+    on(soundBtn, 'click', () => { setSound(!sfx.enabled); if (sfx.enabled) { sfx.play('chime'); chimed = true; } });
+    // the log-on chime waits for the first gesture if the browser had it muted
+    const firstGesture = () => { sfx.unlock(); if (sfx.enabled && !chimed && !booting) { chimed = true; sfx.play('chime'); } };
+    on(desktop, 'pointerdown', firstGesture, true);
+    on(document, 'keydown', firstGesture, true);
+
+    // ── Cursors: the Aero arrow everywhere, the spinning ring while a tool loads ──
+    desktop.style.setProperty('--cur-arrow', ARROW);
+    let busyCount = 0, busyFrame = 0, busyTimer = null;
+    function setBusy(onNow) {
+        busyCount = Math.max(0, busyCount + (onNow ? 1 : -1));
+        if (busyCount > 0 && !busyTimer) {
+            busyTimer = setInterval(() => { busyFrame = (busyFrame + 1) % BUSY.length; desktop.style.cursor = `${BUSY[busyFrame]}, progress`; }, 90);
+            desktop.style.cursor = `${BUSY[0]}, progress`;
+        } else if (busyCount === 0 && busyTimer) {
+            clearInterval(busyTimer); busyTimer = null;
+            desktop.style.cursor = '';
+        }
+    }
+    cleanups.push(() => { if (busyTimer) clearInterval(busyTimer); });
+
+    // ── Boot: a POST screen, then the logo and a progress bar, once per visit ──
+    let booting = desktop.classList.contains('is-booting');
+    const bootTimers = [];
+    cleanups.push(() => bootTimers.forEach(clearTimeout));
+    function finishBoot() {
+        if (!booting) return;
+        booting = false;
+        bootTimers.forEach(clearTimeout);
+        try { sessionStorage.setItem(BOOT_KEY, '1'); } catch { /* fine */ }
+        desktop.classList.remove('is-booting');
+        animate(boot, [{ opacity: 1 }, { opacity: 0 }], reduced ? 0 : 500, 'ease-in').then(() => { boot.hidden = true; });
+        if (sfx.enabled && !chimed) { chimed = true; sfx.play('chime'); }
+        bootTimers.push(setTimeout(() => open('about'), 350));
+    }
+    if (booting) {
+        const post = document.getElementById('dt-boot-post');
+        const logo = document.getElementById('dt-boot-logo');
+        const step = reduced ? 40 : 170;
+        BOOT_LINES.forEach((line, i) => bootTimers.push(setTimeout(() => { post.textContent += line + '\n'; }, 120 + i * step)));
+        bootTimers.push(setTimeout(() => { post.hidden = true; logo.hidden = false; }, 120 + BOOT_LINES.length * step + 250));
+        bootTimers.push(setTimeout(finishBoot, 120 + BOOT_LINES.length * step + (reduced ? 400 : 1500)));
+        on(boot, 'click', finishBoot);
+        on(document, 'keydown', e => { if (booting && (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape')) finishBoot(); });
+    }
+
+    // ── Calendar: click the clock ──
+    let calMonth = null;      // Date at the first of the shown month
+    function renderCal() {
+        const today = new Date();
+        const y = calMonth.getFullYear(), m = calMonth.getMonth();
+        document.getElementById('dt-cal-title').textContent = calMonth.toLocaleDateString([], { month: 'long', year: 'numeric' });
+        const first = (new Date(y, m, 1).getDay() + 6) % 7;      // Monday first
+        const days = new Date(y, m + 1, 0).getDate();
+        const prevDays = new Date(y, m, 0).getDate();
+        let html = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(d => `<span class="dt-cal-dow">${d}</span>`).join('');
+        for (let i = 0; i < 42; i++) {
+            const n = i - first + 1;
+            if (n < 1) html += `<span class="dt-cal-day is-other">${prevDays + n}</span>`;
+            else if (n > days) html += `<span class="dt-cal-day is-other">${n - days}</span>`;
+            else {
+                const isToday = n === today.getDate() && m === today.getMonth() && y === today.getFullYear();
+                html += `<span class="dt-cal-day${isToday ? ' is-today' : ''}${i % 7 >= 5 ? ' is-weekend' : ''}">${n}</span>`;
+            }
+        }
+        document.getElementById('dt-cal-grid').innerHTML = html;
+    }
+    function openCal() { hideMenu(); closeStart(); calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderCal(); cal.hidden = false; }
+    function closeCal() { cal.hidden = true; }
+    on(clock, 'click', () => (cal.hidden ? openCal() : closeCal()));
+    on(cal, 'click', e => {
+        const b = e.target.closest('[data-cal]');
+        if (b) { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + +b.dataset.cal, 1); renderCal(); }
+    });
+
+    // ── Keyboard shortcuts ──
+    const typing = t => t && (t.matches?.('input, textarea, select, [contenteditable]') || t.closest?.('.win-body'));
+    function nearestIcon(from, key) {
+        const a = from.getBoundingClientRect();
+        const cx = a.left + a.width / 2, cy = a.top + a.height / 2;
+        let best = null, bestScore = Infinity;
+        Object.values(iconEls).forEach(el => {
+            if (el === from || el.classList.contains('is-binned')) return;
+            const b = el.getBoundingClientRect();
+            const dx = (b.left + b.width / 2) - cx, dy = (b.top + b.height / 2) - cy;
+            const along = key === 'ArrowLeft' ? -dx : key === 'ArrowRight' ? dx : key === 'ArrowUp' ? -dy : dy;
+            const across = (key === 'ArrowLeft' || key === 'ArrowRight') ? Math.abs(dy) : Math.abs(dx);
+            if (along <= 8) return;                                   // not in that direction
+            const score = along + across * 2.5;
+            if (score < bestScore) { bestScore = score; best = el; }
+        });
+        return best;
+    }
+    on(document, 'keydown', e => {
+        if (booting) return;
+        const t = e.target;
+        if (e.key === 'F5' && !e.ctrlKey && !e.metaKey) { e.preventDefault(); refreshDesktop(); return; }
+        if ((e.key === 'Escape' && e.ctrlKey) || (e.key === 'Meta' && !e.repeat)) { e.preventDefault(); startMenu.hidden ? openStart() : closeStart(); return; }
+        if (e.key === 'Escape') { closeCal(); closeStart(); hideMenu(); const dlg = activeWindow(); if (dlg && dlg.el.classList.contains('is-dialog')) close(dlg); return; }
+        if (e.key === 'F4' && e.altKey) { e.preventDefault(); const rec = activeWindow(); if (rec) close(rec); return; }
+        if (typing(t)) return;
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+            e.preventDefault();
+            Object.values(iconEls).forEach(el => { if (!el.classList.contains('is-binned')) el.classList.add('is-selected'); });
+            return;
+        }
+        if (e.key.startsWith('Arrow')) {
+            const current = t.closest?.('.dt-icon') || desktop.querySelector('.dt-icon.is-selected');
+            if (!current) return;
+            if (t.closest?.('.win')) return;                         // a window has the keyboard
+            e.preventDefault();
+            const next = nearestIcon(current, e.key);
+            if (next) { selectIcon(next); next.focus({ preventScroll: true }); }
+        }
+    });
+    const activeWindow = () => [...windows.values()].find(r => !r.min && r.el.classList.contains('is-active'));
 
     // ── Clock ──
     function tick() {
@@ -451,6 +618,7 @@ function initDesktop(items, writings) {
         }));
         ids.forEach(id => { iconEls[id].classList.add('is-binned'); iconEls[id].classList.remove('is-selected'); binned.add(id); });
         animate(iconEls[BIN.id], [{ transform: 'scale(1.15)' }, { transform: 'none' }], 200);
+        sfx.play('ding');
         syncBin();
     }
     function restoreItems(ids) {
@@ -509,7 +677,9 @@ function initDesktop(items, writings) {
     let ctxEntries = [];
     function showMenu(x, y, entries) {
         closeStart();
+        closeCal();
         hideTip();
+        sfx.play('menu');
         ctxEntries = entries;
         ctx.innerHTML = entries.map((e, i) => e === '-' ? '<hr>' : `
             <button type="button" class="dt-ctx-item${e.bold ? ' is-bold' : ''}${e.disabled ? ' is-disabled' : ''}" data-i="${i}" role="menuitem">
@@ -638,12 +808,14 @@ function initDesktop(items, writings) {
         if (icon) {
             if (icon.dataset.dragged) { delete icon.dataset.dragged; return; }
             selectIcon(icon, e.ctrlKey || e.metaKey);
+            sfx.play('click');
             if (lastPointer === 'touch' || lastPointer === 'pen') open(icon.dataset.item);
             return;
         }
         if (skipClear) { skipClear = false; return; }
         if (!e.target.closest('.win, .dt-taskbar, .dt-startmenu, .dt-ctx')) selectIcon(null);
         if (!e.target.closest('.dt-startmenu, #dt-start')) closeStart();
+        if (!e.target.closest('.dt-cal, #dt-clock')) closeCal();
     });
     on(desktop, 'dblclick', e => {
         const icon = e.target.closest('.dt-icon');
@@ -724,7 +896,7 @@ function initDesktop(items, writings) {
     }
 
     // ── Start menu ──
-    function openStart() { hideMenu(); startMenu.hidden = false; startBtn.classList.add('is-down'); }
+    function openStart() { hideMenu(); closeCal(); sfx.play('click'); startMenu.hidden = false; startBtn.classList.add('is-down'); }
     function closeStart() { startMenu.hidden = true; startBtn.classList.remove('is-down'); }
     on(startBtn, 'click', () => (startMenu.hidden ? openStart() : closeStart()));
     on(startMenu, 'click', e => {
@@ -948,19 +1120,54 @@ function initDesktop(items, writings) {
         tasks.appendChild(task);
         animate(task, [{ transform: 'translateY(6px)', opacity: 0 }, { transform: 'none', opacity: 1 }], 160);
 
-        const rec = { el, task, item, jigsaw: null, min: false, max: false, rect: null };
+        const rec = { el, task, item, jigsaw: null, min: false, max: false, rect: null, saved: null };
         windows.set(item.id, rec);
         winRoot.appendChild(el);
         animate(el, [{ transform: 'scale(0.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], 170);
+        sfx.play('open');
+
+        // a tool is an iframe; spin the cursor until it has loaded
+        const frame = el.querySelector('iframe.dt-app');
+        if (frame) {
+            setBusy(true);
+            let done = false;
+            const started = Date.now();
+            // keep the ring up for at least half a second so it reads as a ring, not a flicker
+            const finish = () => { if (done) return; done = true; setTimeout(() => setBusy(false), Math.max(0, 500 - (Date.now() - started))); };
+            frame.addEventListener('load', finish, { once: true });
+            setTimeout(finish, 8000);
+        }
 
         if (small()) maximise(rec, true);
 
+        // title-bar drag, with Aero-style snapping to the top and side edges
         drag(el.querySelector('.win-title'), {
-            start() { if (rec.max) return false; focus(rec); rec.rect = { x: el.offsetLeft, y: el.offsetTop }; },
+            start(e) {
+                focus(rec);
+                if (rec.max || rec.snapped) {
+                    // pull a maximised or snapped window back to its old size, under the cursor
+                    const b = el.getBoundingClientRect();
+                    const frac = (e.clientX - b.left) / b.width;
+                    const saved = rec.saved || { w: el.offsetWidth, h: el.offsetHeight };
+                    rec.max = false; rec.snapped = null;
+                    el.classList.remove('is-max');
+                    el.style.width = saved.w + 'px';
+                    el.style.height = saved.h + 'px';
+                    el.style.left = Math.round(e.clientX - desktop.getBoundingClientRect().left - frac * saved.w) + 'px';
+                    el.style.top = Math.round(b.top - desktop.getBoundingClientRect().top) + 'px';
+                }
+                rec.rect = { x: el.offsetLeft, y: el.offsetTop };
+            },
             move(dx, dy) {
                 const b = area();
-                el.style.left = clamp(rec.rect.x + dx, -w + 80, b.w - 80) + 'px';
+                el.style.left = clamp(rec.rect.x + dx, -el.offsetWidth + 80, b.w - 80) + 'px';
                 el.style.top = clamp(rec.rect.y + dy, 0, b.h - 40) + 'px';
+                showSnap(snapZone());
+            },
+            end(moved) {
+                const zone = moved ? snapZone() : null;
+                showSnap(null);
+                if (zone) applySnap(rec, zone);
             },
         });
         drag(el.querySelector('.win-resize'), {
@@ -994,6 +1201,39 @@ function initDesktop(items, writings) {
         return rec;
     }
 
+    // ── Snapping ──
+    function snapZone() {
+        if (small()) return null;
+        const d = desktop.getBoundingClientRect();
+        if (pointer.y <= d.top + 3) return 'top';
+        if (pointer.x <= d.left + 3) return 'left';
+        if (pointer.x >= d.right - 4) return 'right';
+        return null;
+    }
+    function showSnap(zone) {
+        if (!zone) { snap.hidden = true; return; }
+        const a = area();
+        const box = zone === 'top' ? { l: 0, t: 0, w: a.w, h: a.h } : { l: zone === 'left' ? 0 : a.w / 2, t: 0, w: a.w / 2, h: a.h };
+        const was = snap.hidden;
+        snap.hidden = false;
+        Object.assign(snap.style, { left: box.l + 'px', top: box.t + 'px', width: box.w + 'px', height: box.h + 'px' });
+        if (was) animate(snap, [{ opacity: 0, transform: 'scale(0.97)' }, { opacity: 1, transform: 'none' }], 140);
+    }
+    function applySnap(rec, zone) {
+        rec.saved = { w: rec.el.offsetWidth, h: rec.el.offsetHeight };
+        if (zone === 'top') { maximise(rec, true); return; }
+        const a = area();
+        const before = rec.el.getBoundingClientRect();
+        rec.snapped = zone;
+        Object.assign(rec.el.style, { left: (zone === 'left' ? 0 : a.w / 2) + 'px', top: '0px', width: a.w / 2 + 'px', height: a.h + 'px' });
+        const after = rec.el.getBoundingClientRect();
+        animate(rec.el, [
+            { transformOrigin: '0 0', transform: `translate(${before.left - after.left}px, ${before.top - after.top}px) scale(${before.width / after.width}, ${before.height / after.height})` },
+            { transformOrigin: '0 0', transform: 'none' },
+        ], 180, 'ease-out');
+        if (rec.jigsaw) window.dispatchEvent(new Event('resize'));
+    }
+
     function focus(rec) {
         windows.forEach(r => { r.el.classList.remove('is-active'); r.task.classList.remove('is-active'); });
         rec.el.classList.add('is-active');
@@ -1025,6 +1265,8 @@ function initDesktop(items, writings) {
     }
     function maximise(rec, force) {
         const before = rec.el.getBoundingClientRect();
+        if (!rec.max) rec.saved = { w: rec.el.offsetWidth, h: rec.el.offsetHeight };
+        rec.snapped = null;
         rec.max = force ? true : !rec.max;
         rec.el.classList.toggle('is-max', rec.max);
         if (!force && !reduced) {
@@ -1041,6 +1283,7 @@ function initDesktop(items, writings) {
     function close(rec) {
         if (rec.jigsaw) rec.jigsaw();
         windows.delete(rec.item.id);
+        sfx.play('close');
         rec.el.classList.remove('is-active');
         animate(rec.task, [{ transform: 'none', opacity: 1 }, { transform: 'translateY(6px)', opacity: 0 }], 140).then(() => rec.task.remove());
         animate(rec.el, [{ transform: 'none', opacity: 1 }, { transform: 'scale(0.94)', opacity: 0 }], 140, 'ease-in').then(() => rec.el.remove());
@@ -1083,7 +1326,7 @@ function initDesktop(items, writings) {
             if (e.button !== 0) return;
             const control = e.target.closest('button, a, iframe');
             if (control && control !== handle) return;     // a button inside the handle, not the handle itself
-            if (start && start() === false) return;
+            if (start && start(e) === false) return;
             active = true; moved = false; sx = e.clientX; sy = e.clientY;
             desktop.classList.add('is-dragging');    // iframes stop eating pointer events
             handle.setPointerCapture?.(e.pointerId);
@@ -1095,13 +1338,13 @@ function initDesktop(items, writings) {
 
     // a phone-sized viewport gets every window full-screen; otherwise keep icons on screen
     on(window, 'resize', () => {
-        hideMenu(); hideTip();
+        hideMenu(); hideTip(); closeCal(); showSnap(null);
         if (small()) windows.forEach(r => { if (!r.max) maximise(r, true); });
         else Object.keys(iconEls).forEach(place);
     });
 
-    // open the About window on arrival, like a login greeting
-    const greet = setTimeout(() => open('about'), 150);
+    // open the About window on arrival, like a login greeting (after the boot screen, if there is one)
+    const greet = setTimeout(() => { if (!booting) open('about'); }, 150);
     cleanups.push(() => clearTimeout(greet));
 
     return function cleanup() {

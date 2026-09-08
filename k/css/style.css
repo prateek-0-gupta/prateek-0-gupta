@@ -1092,6 +1092,150 @@ footer {
     .dt-icon, .dt-icon-img { transition: none; }
 }
 
+
+/* ── Boot screen ── */
+.desktop.is-booting > :not(.dt-boot) { opacity: 0; }
+.desktop > :not(.dt-boot) { transition: opacity 600ms ease-out; }
+.dt-boot {
+    position: absolute;
+    inset: 0;
+    z-index: 30000;
+    background: #000;
+    color: #c8c8c8;
+    display: flex;
+    flex-direction: column;
+    cursor: default;
+}
+.dt-boot[hidden] { display: none; }
+.dt-boot-post {
+    margin: 0;
+    padding: 28px 34px;
+    font: 14px/1.6 'JetBrains Mono', 'Lucida Console', monospace;
+    white-space: pre-wrap;
+    color: #d0d0d0;
+    text-shadow: 0 0 6px rgba(200,200,200,0.35);
+}
+.dt-boot-post::after { content: '▌'; animation: dt-blink 1s steps(2) infinite; }
+@keyframes dt-blink { to { visibility: hidden; } }
+.dt-boot-logo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 26px;
+    animation: dt-fade 300ms ease-out;
+}
+.dt-boot-logo[hidden] { display: none; }
+.dt-boot-word {
+    font: italic 700 clamp(34px, 6vw, 64px) 'Trebuchet MS', 'Segoe UI', sans-serif;
+    letter-spacing: -0.02em;
+    color: #fff;
+    text-shadow: 0 0 18px rgba(126,249,255,0.55), 0 2px 0 #0b4fa8;
+}
+.dt-boot-word span { color: var(--neon); font-weight: 400; }
+.dt-boot-bar {
+    width: 220px; height: 16px;
+    padding: 2px;
+    border: 1px solid #6d8fb8;
+    border-radius: 4px;
+    background: #0b1a3f;
+    display: flex;
+    gap: 3px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
+}
+.dt-boot-bar i {
+    width: 18px; height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(180deg, #8fd0ff, #1e90d8 55%, #0b4fa8);
+    animation: dt-slide 1.4s linear infinite;
+}
+.dt-boot-bar i:nth-child(2) { animation-delay: 0.12s; }
+.dt-boot-bar i:nth-child(3) { animation-delay: 0.24s; }
+@keyframes dt-slide { from { transform: translateX(-60px); } to { transform: translateX(240px); } }
+.dt-boot-hint { font: 11px var(--ui); color: rgba(255,255,255,0.4); }
+
+/* ── Cursors ── */
+.desktop { cursor: var(--cur-arrow, default), default; }
+.desktop :is(button, .dt-icon, .win-title, .dt-menu-item, .dt-ctx-item, .dt-task, .dt-file, .dt-doc-menu span, .dt-boot) { cursor: inherit; }
+
+/* ── Tray buttons, calendar ── */
+.dt-tray-btn {
+    width: 22px; height: 22px;
+    padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
+}
+.dt-tray-btn:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.35); }
+.dt-tray-btn svg { width: 16px; height: 16px; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4)); }
+.dt-clock {
+    padding: 2px 6px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    font-size: 11px;
+}
+.dt-clock:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.35); }
+.dt-cal {
+    position: absolute;
+    right: 8px;
+    bottom: calc(var(--bar) + 4px);
+    z-index: 10000;
+    width: 240px;
+    padding: 8px;
+    background: rgba(240, 246, 252, 0.9);
+    border: 1px solid rgba(255,255,255,0.85);
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 1px rgba(20,60,120,0.3), 0 8px 24px rgba(0,25,70,0.35);
+    backdrop-filter: blur(12px) saturate(1.3);
+    -webkit-backdrop-filter: blur(12px) saturate(1.3);
+    animation: dt-rise 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform-origin: bottom right;
+}
+.dt-cal[hidden] { display: none; }
+.dt-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.dt-cal-head button {
+    width: 22px; height: 20px;
+    background: linear-gradient(180deg, #fff, #e6edf5);
+    border: 1px solid #9aabc0; border-radius: 3px;
+    font-size: 10px; color: #1e3557;
+}
+.dt-cal-title { font-weight: 700; color: #0b2a5c; }
+.dt-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-size: 11px; }
+.dt-cal-dow { color: #4b5f7a; font-size: 10px; padding-bottom: 2px; }
+.dt-cal-day { padding: 3px 0; border-radius: 3px; color: #0b2340; }
+.dt-cal-day.is-weekend { color: #0b4fa8; }
+.dt-cal-day.is-other { color: #a5b2c4; }
+.dt-cal-day.is-today { background: linear-gradient(180deg, #3d9ee6, #1a6fc4); color: #fff; font-weight: 700; box-shadow: 0 0 0 1px #0b4fa8; }
+.dt-cal-day:hover { background: rgba(30,144,216,0.2); }
+
+/* ── Snap preview ── */
+.dt-snap {
+    position: absolute;
+    z-index: 8000;
+    pointer-events: none;
+    background: rgba(255,255,255,0.22);
+    border: 1px solid rgba(255,255,255,0.85);
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 1px rgba(30,144,216,0.5), inset 0 0 40px rgba(255,255,255,0.25);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+.dt-snap[hidden] { display: none; }
+
+@media (max-width: 720px) {
+    .dt-tray-btn { display: none; }
+    .dt-cal { left: 8px; right: 8px; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .desktop > :not(.dt-boot) { transition: none; }
+    .dt-boot-bar i, .dt-boot-post::after { animation: none; }
+    .dt-cal { animation: none; }
+}
+
 /* ── Small screens: icons flow in a grid, windows fill the screen ── */
 @media (max-width: 720px) {
     .dt-icons {
