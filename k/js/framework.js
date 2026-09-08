@@ -332,6 +332,7 @@ export default class Framework {
         this.decorateLinks();
         flushEffects();
         this.afterRender();
+        if (typeof this.onRender === 'function') this.onRender(match);
     }
 
     // Give data-links real hrefs (so open-in-new-tab and copy-link work) and

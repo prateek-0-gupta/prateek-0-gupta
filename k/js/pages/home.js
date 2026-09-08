@@ -7,18 +7,28 @@ import { useEffect, navigate } from '../framework.js';
 import { ARTICLES } from './articles/articles-data.js';
 import { POSTERS } from '../poster-manifest.js';
 import { initJigsawTypography } from '../components/jigsaw.js';
-import { ICONS } from '../components/desktop-icons.js';
+import { ICONS, iconHtml } from '../components/desktop-icons.js';
 import { createSfx } from '../components/sfx.js';
 import { ARROW, BUSY } from '../components/cursors.js';
 
 // ── Content ──────────────────────────────────────────────────────────
 
 const POSTER_DIR = 'js/pages/projects/posters/assets';
-const STORE_KEY = 'prateek-desktop-icons-v1';
+const STORE_KEY = 'prateek-desktop-icons-v3';    // v3: the hand-arranged layout
 const BIN_KEY = 'prateek-desktop-bin-v1';
 const WALL_KEY = 'prateek-desktop-wall-v1';
 const SOUND_KEY = 'prateek-desktop-sound-v1';
 const BOOT_KEY = 'prateek-desktop-booted';     // sessionStorage: once per visit
+const ICON_KEY = 'prateek-desktop-icons-theme-v1';
+
+const ICON_THEMES = [{ id: 'aero', label: 'Aero' }, { id: 'classic', label: 'Classic' }];
+let iconTheme = 'aero';
+try { iconTheme = localStorage.getItem(ICON_KEY) || 'aero'; } catch { /* fine */ }
+
+// every icon in the markup goes through here, so a theme switch can re-draw them in place
+function ico(name, big = false) {
+    return `<i class="dt-ico" data-icon="${name}"${big ? ' data-big="1"' : ''}>${iconHtml(name, iconTheme, big)}</i>`;
+}
 
 const BOOT_LINES = [
     'prat.ee BIOS v2.6  (c) 2026 Prateek Kumar Gupta',
@@ -30,16 +40,30 @@ const BOOT_LINES = [
     'Loading desktop ...',
 ];
 
-const TOOLS = [
-    { id: 'about',   label: 'About Me',                 icon: 'computer', kind: 'about', desc: 'prat.ee/k — Manchester, UK' },
+// One icon per kind of thing: programs have their own, every article is a
+// document, every dataset a stack of discs, every repository a code folder.
+
+const ABOUT = { id: 'about', label: 'About Me', icon: 'computer', kind: 'about', desc: 'prat.ee/k — Manchester, UK' };
+
+const PROGRAMS = [
     { id: 'snake',   label: 'Nagmani',                  icon: 'snake',    kind: 'app',   href: '/snake',            desc: 'an Indian gothic snake game' },
     { id: 'p2pchat', label: 'p2p chat',                 icon: 'chat',     kind: 'app',   href: '/p2pchat',          desc: 'a serverless p2p chat' },
     { id: 'bvh',     label: 'BVH Viewer',               icon: 'mocap',    kind: 'app',   href: '/bvhviewer',        desc: 'a BVH motion-capture file viewer' },
     { id: 'think',   label: 'I Think Therefore I Am',   icon: 'bulb',     kind: 'app',   href: '/ithinkthereforiam', desc: 'an infinite thought canvas' },
-    { id: 'human',   label: 'Digital Human',            icon: 'human',    kind: 'link',  href: 'https://avatar.sumvivas.com', desc: 'three.js based AI-driven Digital Human' },
+];
+
+const MEDIA = [
     { id: 'film',    label: 'Digital Doppelgänger',     icon: 'film',     kind: 'video', video: 'xPZ85jpZTsw',      desc: 'a short film' },
-    { id: 'posters', label: 'Posters',                  icon: 'folder',   kind: 'folder', desc: 'poster art, a hundred-odd of them' },
     { id: 'music',   label: 'Monsoon Protocol',         icon: 'music',    kind: 'audio', track: 'https://soundcloud.com/prateek-gupta-505317056/2026-09-07t16_31_11-216z', desc: 'a song, on SoundCloud' },
+    { id: 'posters', label: 'Posters',                  icon: 'folder',   kind: 'folder', desc: 'poster art, a hundred-odd of them' },
+];
+
+const LINKS = [
+    { id: 'human',     label: 'Digital Human',  icon: 'human',   kind: 'link', href: 'https://avatar.sumvivas.com', desc: 'three.js based AI-driven Digital Human, at Sum Vivas' },
+    { id: 'hf-movies', label: 'allaimovies',    icon: 'dataset', kind: 'link', href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies',               desc: 'dataset: 3,090 films with an AI in them, coded and counted' },
+    { id: 'hf-chars',  label: 'ai characters',  icon: 'dataset', kind: 'link', href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies-ai-characters', desc: 'dataset: 3,263 AI characters from 1,884 films' },
+    { id: 'companyhouse', label: 'companyhouse', icon: 'repo',  kind: 'link', href: 'https://github.com/prateek-0-gupta/companyhouse',                          desc: 'repository: UK Companies House reports and a director interlock graph' },
+    { id: 'aitoy',     label: 'aitoy',          icon: 'repo',    kind: 'link', href: 'https://github.com/prateek-0-gupta/aitoy',                                desc: 'repository: a £20 ESP32-S3 board turned into a push-to-talk voice assistant' },
 ];
 
 const SOCIALS = [
@@ -48,13 +72,7 @@ const SOCIALS = [
     { id: 'mail',      label: 'E-mail',    icon: 'mail',     kind: 'link', href: 'mailto:prateekgupta1198@gmail.com', desc: 'say hello' },
 ];
 
-// these land at random spots on the desktop, like files someone saved in a hurry
-const LINKS = [
-    { id: 'hf-movies', label: 'allaimovies',   icon: 'dataset', kind: 'link', href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies',               desc: 'dataset: 3,090 films with an AI in them, coded and counted' },
-    { id: 'hf-chars',  label: 'ai characters', icon: 'dataset', kind: 'link', href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies-ai-characters', desc: 'dataset: 3,263 AI characters from 1,884 films' },
-    { id: 'companyhouse', label: 'companyhouse', icon: 'repo', kind: 'link', href: 'https://github.com/prateek-0-gupta/companyhouse',                          desc: 'UK Companies House reports and a director interlock graph' },
-    { id: 'aitoy',     label: 'aitoy',         icon: 'robot',   kind: 'link', href: 'https://github.com/prateek-0-gupta/aitoy',                                desc: 'a £20 ESP32-S3 board turned into a push-to-talk voice assistant' },
-];
+const TOOLS = [ABOUT, ...PROGRAMS, ...MEDIA];
 
 const BIN = { id: 'bin', label: 'Recycle Bin', icon: 'bin', kind: 'bin', desc: 'contains anything you dragged onto it' };
 
@@ -87,20 +105,20 @@ function writingItems() {
 function iconEl(item) {
     return `
     <button class="dt-icon" type="button" data-item="${item.id}" data-tip="${escapeAttr(item.desc || item.label)}">
-        <span class="dt-icon-img">${ICONS[item.icon]}</span>
+        <span class="dt-icon-img">${ico(item.icon, true)}</span>
         <span class="dt-icon-label">${escapeHtml(item.label)}</span>
     </button>`;
 }
 
 function menuItem(item) {
     return `<button class="dt-menu-item" type="button" data-item="${item.id}">
-        <span class="dt-menu-ico">${ICONS[item.icon]}</span><span class="dt-menu-text">${escapeHtml(item.label)}</span>
+        <span class="dt-menu-ico">${ico(item.icon)}</span><span class="dt-menu-text">${escapeHtml(item.label)}</span>
     </button>`;
 }
 
 function menuAction(action, icon, label) {
     return `<button class="dt-menu-item" type="button" data-menu="${action}">
-        <span class="dt-menu-ico">${ICONS[icon]}</span><span class="dt-menu-text">${label}</span>
+        <span class="dt-menu-ico">${ico(icon)}</span><span class="dt-menu-text">${label}</span>
     </button>`;
 }
 
@@ -193,7 +211,7 @@ function folderHtml(item, images) {
         <div class="dt-folder-bar">
             <span class="dt-folder-nav"><span>◀</span><span>▶</span><span>▲</span></span>
             <span class="dt-folder-addr-label">Address</span>
-            <span class="dt-folder-addr">${ICONS.folder}<span>C:\\Prateek\\${escapeHtml(item.label)}</span></span>
+            <span class="dt-folder-addr">${ico('folder')}<span>C:\\Prateek\\${escapeHtml(item.label)}</span></span>
         </div>
         <div class="dt-folder-grid">${files}</div>
     </div>`;
@@ -226,7 +244,7 @@ function binHtml(binned) {
     return `<div class="dt-bin">
         <div class="dt-bin-list">${binned.map(it => `
             <div class="dt-bin-row">
-                <span class="dt-bin-ico">${ICONS[it.icon]}</span>
+                <span class="dt-bin-ico">${ico(it.icon)}</span>
                 <span class="dt-bin-name">${escapeHtml(it.label)}</span>
                 <button type="button" class="dt-btn" data-restore="${it.id}">Restore</button>
             </div>`).join('')}
@@ -242,7 +260,7 @@ function propsHtml(item, type, where) {
     return `
     <div class="dt-dialog dt-props">
         <div class="dt-dialog-body">
-            <div class="dt-props-head">${ICONS[item.icon]}<span class="dt-props-name">${escapeHtml(item.label)}</span></div>
+            <div class="dt-props-head">${ico(item.icon, true)}<span class="dt-props-name">${escapeHtml(item.label)}</span></div>
             <table class="dt-kv">
                 <tr><th>Type</th><td>${type}</td></tr>
                 <tr><th>Location</th><td>${link}</td></tr>
@@ -260,6 +278,9 @@ function displayHtml(current) {
         <div class="dt-walls">${WALLS.map(w => `
             <button type="button" class="dt-wall${w.id === current ? ' is-on' : ''}" data-wall="${w.id}" data-tip="${w.label}"><span>${w.label}</span></button>`).join('')}
         </div>
+        <div class="dt-display-row"><span>Icons</span>${ICON_THEMES.map(t => `
+            <button type="button" class="dt-btn dt-icontheme${t.id === iconTheme ? ' is-default' : ''}" data-icons="${t.id}">${t.label}</button>`).join('')}
+        </div>
         <div class="dt-dialog-foot"><button type="button" class="dt-btn is-default" data-act="close">OK</button></div>
     </div>`;
 }
@@ -275,7 +296,7 @@ export default function Home() {
     // the whole desktop opts out of DOM morphing: it never re-renders, and
     // a hash change (a link inside a document) must not wipe open windows
     return `
-    <div class="desktop${booted ? '' : ' is-booting'}" id="desktop" data-morph-ignore>
+    <div class="desktop${booted ? '' : ' is-booting'}" id="desktop" data-icons="${iconTheme}" data-morph-ignore>
         <div class="dt-boot" id="dt-boot"${booted ? ' hidden' : ''}>
             <pre class="dt-boot-post" id="dt-boot-post"></pre>
             <div class="dt-boot-logo" id="dt-boot-logo" hidden>
@@ -292,13 +313,16 @@ export default function Home() {
         <div class="dt-startmenu" id="dt-startmenu" hidden>
             <div class="dt-menu-side"><span>prat.ee/k</span></div>
             <div class="dt-menu-list">
-                ${menuItem(TOOLS[0])}
+                ${menuItem(ABOUT)}
                 <hr>
-                ${TOOLS.slice(1).map(menuItem).join('')}
+                ${PROGRAMS.map(menuItem).join('')}
                 <hr>
                 ${writings.map(menuItem).join('')}
                 <hr>
+                ${MEDIA.map(menuItem).join('')}
+                <hr>
                 ${LINKS.map(menuItem).join('')}
+                <hr>
                 ${SOCIALS.map(menuItem).join('')}
                 <hr>
                 ${menuAction('display', 'display', 'Display Properties…')}
@@ -308,7 +332,7 @@ export default function Home() {
         </div>
 
         <div class="dt-taskbar">
-            <button class="dt-start" type="button" id="dt-start" data-tip="Click here to begin">${ICONS.logo}<span>start</span></button>
+            <button class="dt-start" type="button" id="dt-start" data-tip="Click here to begin">${ico('logo')}<span>start</span></button>
             <div class="dt-tasks" id="dt-tasks"></div>
             <div class="dt-tray">
                 <span class="dt-tray-note">Manchester, UK</span>
@@ -528,36 +552,42 @@ function initDesktop(items, writings) {
     }
     setWall(store.get(WALL_KEY, 'aero'));
 
+    function setIconTheme(id) {
+        if (!ICON_THEMES.some(t => t.id === id)) id = 'aero';
+        iconTheme = id;
+        store.set(ICON_KEY, id);
+        desktop.dataset.icons = id;
+        desktop.querySelectorAll('.dt-ico').forEach(el => { el.innerHTML = iconHtml(el.dataset.icon, id, !!el.dataset.big); });
+        desktop.querySelectorAll('.dt-icontheme').forEach(b => b.classList.toggle('is-default', b.dataset.icons === id));
+    }
+
     // ── Icon layout: columns for the regulars, random spots for the links, remembered once moved ──
     const ICON_W = 92, ICON_H = 92, COL = 98, ROW = 98;
     const area = () => ({ w: desktop.clientWidth, h: desktop.clientHeight - 34 });
     const iconEls = Object.fromEntries([...desktop.querySelectorAll('.dt-icon')].map(el => [el.dataset.item, el]));
 
+    // the arrangement, anchored to the screen edges so it survives other sizes:
+    // programs and media down the left, documents beside them, the song
+    // floating near the top, datasets low in the middle, socials up the right
+    // edge, the repositories down by the bin
     function defaultLayout() {
         const a = area();
         const pos = {};
-        const columns = [TOOLS, writings, SOCIALS];
-        columns.forEach((col, c) => col.forEach((it, r) => { pos[it.id] = { x: 12 + c * COL, y: 12 + r * ROW }; }));
+        // a column that would run off the bottom squeezes its rows together instead
+        const column = (items, x, y0 = 12) => {
+            const pitch = items.length > 1 ? Math.min(ROW, Math.floor((a.h - y0 - ICON_H - 8) / (items.length - 1))) : ROW;
+            items.forEach((it, r) => { pos[it.id] = { x, y: y0 + r * Math.max(72, pitch) }; });
+        };
+        const rightX = Math.max(12 + 4 * COL, a.w - 276);
+        column([ABOUT, ...PROGRAMS, ...LINKS.filter(it => it.id === 'human'), ...MEDIA.filter(it => it.id !== 'music')], 12);
+        column(writings, 12 + Math.round(COL * 1.8));
+        column(SOCIALS, rightX);
+        pos.music = { x: Math.max(12 + 3 * COL, Math.round(a.w * 0.3)), y: 60 };
+        pos['hf-chars']  = { x: Math.max(12 + 3 * COL, Math.round(a.w * 0.18)), y: a.h - 160 };
+        pos['hf-movies'] = { x: pos['hf-chars'].x + 85, y: a.h - 160 };
+        pos.companyhouse = { x: rightX + 18, y: a.h - 240 };
+        pos.aitoy        = { x: rightX + 18, y: a.h - 142 };
         pos[BIN.id] = { x: a.w - ICON_W - 12, y: a.h - ICON_H - 12 };
-
-        // scatter the links across the free space, avoiding each other and
-        // the patch where the About window opens
-        const taken = Object.values(pos).map(p => ({ ...p }));
-        for (let x = (a.w - 560) / 2 - 60; x < (a.w + 560) / 2 - 60; x += COL) {
-            for (let y = (a.h - 470) / 2 - 30; y < (a.h + 470) / 2 - 30; y += ROW) taken.push({ x, y });
-        }
-        const left = 12 + columns.length * COL + 40;
-        const right = Math.max(left + 40, a.w - ICON_W - 140);
-        const bottom = Math.max(60, a.h - ICON_H - 40);
-        LINKS.forEach(it => {
-            let p, tries = 0;
-            do {
-                p = { x: Math.round(left + Math.random() * (right - left)), y: Math.round(12 + Math.random() * (bottom - 12)) };
-                tries++;
-            } while (tries < 80 && taken.some(t => Math.abs(t.x - p.x) < COL + 8 && Math.abs(t.y - p.y) < ROW + 8));
-            pos[it.id] = p;
-            taken.push(p);
-        });
         return pos;
     }
 
@@ -575,7 +605,6 @@ function initDesktop(items, writings) {
     const stored = store.get(STORE_KEY, null);
     let positions = { ...defaultLayout(), ...(stored || {}) };
     Object.keys(iconEls).forEach(place);
-    if (!stored) savePositions();          // so the random spots stay where they landed
 
     function arrangeIcons() {
         store.del(STORE_KEY);
@@ -598,7 +627,7 @@ function initDesktop(items, writings) {
     };
     function syncBin() {
         store.set(BIN_KEY, [...binned]);
-        iconEls[BIN.id].querySelector('.dt-icon-img').innerHTML = binned.size ? ICONS.binFull : ICONS.bin;
+        iconEls[BIN.id].querySelector('.dt-icon-img').innerHTML = ico(binned.size ? 'binFull' : 'bin', true);
         iconEls[BIN.id].dataset.tip = binned.size ? `${binned.size} item${binned.size === 1 ? '' : 's'} inside` : BIN.desc;
         binWindowRefresh();
     }
@@ -683,7 +712,7 @@ function initDesktop(items, writings) {
         ctxEntries = entries;
         ctx.innerHTML = entries.map((e, i) => e === '-' ? '<hr>' : `
             <button type="button" class="dt-ctx-item${e.bold ? ' is-bold' : ''}${e.disabled ? ' is-disabled' : ''}" data-i="${i}" role="menuitem">
-                <span class="dt-ctx-ico">${e.icon ? ICONS[e.icon] : ''}</span><span>${escapeHtml(e.label)}</span>
+                <span class="dt-ctx-ico">${e.icon ? ico(e.icon) : ''}</span><span>${escapeHtml(e.label)}</span>
             </button>`).join('');
         ctx.hidden = false;
         const d = desktop.getBoundingClientRect();
@@ -959,6 +988,10 @@ function initDesktop(items, writings) {
             const b = e.target.closest('[data-wall]');
             if (b) setWall(b.dataset.wall);
         });
+        rec.el.querySelector('.dt-display-row').addEventListener('click', e => {
+            const b = e.target.closest('[data-icons]');
+            if (b) setIconTheme(b.dataset.icons);
+        });
     }
 
     function openDoc(item) {
@@ -1087,7 +1120,7 @@ function initDesktop(items, writings) {
         el.dataset.win = item.id;
         el.innerHTML = `
             <header class="win-title">
-                <span class="win-ico">${ICONS[icon]}</span>
+                <span class="win-ico">${ico(icon)}</span>
                 <span class="win-name">${escapeHtml(item.label)}</span>
                 <span class="win-btns">
                     <button type="button" data-act="min" aria-label="Minimise" data-tip="Minimise">_</button>
@@ -1116,7 +1149,7 @@ function initDesktop(items, writings) {
         task.type = 'button';
         task.className = 'dt-task';
         task.dataset.tip = item.label;
-        task.innerHTML = `<span class="dt-task-ico">${ICONS[icon]}</span><span>${escapeHtml(item.label)}</span>`;
+        task.innerHTML = `<span class="dt-task-ico">${ico(icon)}</span><span>${escapeHtml(item.label)}</span>`;
         tasks.appendChild(task);
         animate(task, [{ transform: 'translateY(6px)', opacity: 0 }, { transform: 'none', opacity: 1 }], 160);
 

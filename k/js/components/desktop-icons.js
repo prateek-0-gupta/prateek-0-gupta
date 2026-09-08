@@ -230,3 +230,28 @@ export const ICONS = {
         r(5, 16, 22, 1, K)
     ),
 };
+
+
+// ── The Aero set: glossy SVG files in media/svg/{32,256}/ ──────────────
+// Keys match ICONS. Anything missing here (the tray speakers) stays pixel.
+
+const AERO = {
+    computer: '01-computer', snake: '02-snake', chat: '03-chat', mocap: '04-mocap', bulb: '05-bulb',
+    human: '06-human', film: '07-film', folder: '08-folder', music: '09-music', doc: '10-doc',
+    wordpad: '11-wordpad', camera: '12-camera', linkedin: '13-linkedin', mail: '14-mail',
+    dataset: '15-dataset', repo: '16-repo', robot: '17-robot', bin: '18-bin', binFull: '18-bin',
+    logo: '19-logo', power: '20-power', pictures: '21-pictures', viewer: '22-viewer', display: '01-computer',
+};
+
+/**
+ * Markup for one icon. theme 'aero' uses the SVG files (256 px source when
+ * `big`, 32 px otherwise); anything else falls back to the pixel art.
+ */
+export function iconHtml(name, theme = 'aero', big = false) {
+    const file = theme === 'aero' ? AERO[name] : null;
+    if (!file) return ICONS[name] || '';
+    const src = f => `media/svg/${big ? 256 : 32}/${f}.svg`;
+    const img = f => `<img src="${src(f)}" alt="" draggable="false" decoding="async">`;
+    if (name === 'binFull') return `<span class="dt-ico-stack">${img(file)}<img class="dt-ico-peek" src="${src('10-doc')}" alt="" draggable="false"></span>`;
+    return img(file);
+}

@@ -293,7 +293,7 @@ footer {
     touch-action: none;
 }
 .dt-icon:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.35); }
-.dt-icon-img svg { width: 32px; height: 32px; display: block; filter: drop-shadow(0 2px 2px rgba(0,20,60,0.45)); }
+.dt-icon-img :is(svg, img) { width: 32px; height: 32px; display: block; filter: drop-shadow(0 2px 2px rgba(0,20,60,0.45)); }
 .dt-icon-label {
     font-size: 11px;
     line-height: 1.25;
@@ -356,7 +356,7 @@ footer {
     cursor: default;
 }
 .win.is-active .win-title { color: #0b2a5c; }
-.win-ico svg { width: 16px; height: 16px; display: block; }
+.win-ico :is(svg, img) { width: 16px; height: 16px; display: block; }
 .win-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .win-btns { display: flex; gap: 3px; }
 .win-btns button {
@@ -605,7 +605,7 @@ footer {
     white-space: nowrap;
     overflow: hidden;
 }
-.dt-folder-addr svg { width: 16px; height: 16px; flex: none; }
+.dt-folder-addr :is(svg, img) { width: 16px; height: 16px; flex: none; }
 .dt-folder-grid {
     flex: 1;
     min-height: 0;
@@ -766,7 +766,7 @@ footer {
     text-shadow: 0 1px 1px rgba(0,0,0,0.4);
     outline: none;
 }
-.dt-menu-ico svg { width: 20px; height: 20px; display: block; flex: none; }
+.dt-menu-ico :is(svg, img) { width: 20px; height: 20px; display: block; flex: none; }
 .dt-menu-list hr { border: 0; border-top: 1px solid rgba(20,60,120,0.2); border-bottom: 1px solid #fff; margin: 3px 4px; }
 
 /* ── Taskbar: glossy blue, green start orb ── */
@@ -799,7 +799,7 @@ footer {
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), inset -2px 0 3px rgba(0,0,0,0.15), 2px 0 4px rgba(0,0,0,0.25);
     cursor: default;
 }
-.dt-start svg { width: 20px; height: 20px; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4)); }
+.dt-start :is(svg, img) { width: 20px; height: 20px; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4)); }
 .dt-start:hover { filter: brightness(1.08); }
 .dt-start.is-down, .dt-start:active {
     background: linear-gradient(180deg, #2f8f2f 0%, #3fb63f 60%, #5fcf5f 100%);
@@ -840,7 +840,7 @@ footer {
     box-shadow: inset 0 1px 4px rgba(0,0,0,0.4);
     font-weight: 700;
 }
-.dt-task-ico svg { width: 16px; height: 16px; display: block; flex: none; }
+.dt-task-ico :is(svg, img) { width: 16px; height: 16px; display: block; flex: none; }
 .dt-tray {
     display: flex;
     align-items: center;
@@ -976,7 +976,7 @@ footer {
     outline: none;
 }
 .dt-ctx-ico { width: 16px; height: 16px; flex: none; }
-.dt-ctx-ico svg { width: 16px; height: 16px; display: block; }
+.dt-ctx-ico :is(svg, img) { width: 16px; height: 16px; display: block; }
 .dt-ctx-ico:empty { visibility: hidden; }
 .dt-ctx hr { border: 0; border-top: 1px solid rgba(20,60,120,0.2); border-bottom: 1px solid #fff; margin: 3px 6px; }
 
@@ -1019,7 +1019,7 @@ footer {
 .dt-bin-list { flex: 1; overflow: auto; background: #fff; border: 1px solid #9aabc0; margin: 8px 8px 0; }
 .dt-bin-row { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid #eef1f5; }
 .dt-bin-row:hover { background: #eef4fb; }
-.dt-bin-ico svg { width: 20px; height: 20px; display: block; }
+.dt-bin-ico :is(svg, img) { width: 20px; height: 20px; display: block; }
 .dt-bin-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dt-bin-foot { display: flex; justify-content: flex-end; gap: 6px; padding: 8px; }
 
@@ -1043,7 +1043,7 @@ footer {
 .dt-dialog-body { flex: 1; min-height: 0; }
 .dt-dialog-foot { display: flex; justify-content: flex-end; gap: 6px; padding-top: 10px; }
 .dt-props-head { display: flex; align-items: center; gap: 12px; padding: 4px 4px 12px; border-bottom: 1px solid var(--sh); box-shadow: 0 1px 0 #fff; margin-bottom: 10px; }
-.dt-props-head svg { width: 40px; height: 40px; display: block; filter: drop-shadow(0 2px 2px rgba(0,20,60,0.3)); }
+.dt-props-head :is(svg, img) { width: 40px; height: 40px; display: block; filter: drop-shadow(0 2px 2px rgba(0,20,60,0.3)); }
 .dt-props-name { font-size: 13px; font-weight: 600; }
 .dt-props .dt-kv th { width: 80px; }
 .dt-props .dt-kv td { word-break: break-all; }
@@ -1170,7 +1170,7 @@ footer {
     border-radius: 3px;
 }
 .dt-tray-btn:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.35); }
-.dt-tray-btn svg { width: 16px; height: 16px; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4)); }
+.dt-tray-btn :is(svg, img) { width: 16px; height: 16px; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.4)); }
 .dt-clock {
     padding: 2px 6px;
     background: none;
@@ -1235,6 +1235,18 @@ footer {
     .dt-boot-bar i, .dt-boot-post::after { animation: none; }
     .dt-cal { animation: none; }
 }
+
+
+/* ── Icon themes: the glossy SVG files, or the pixel art ── */
+.dt-ico { display: contents; }
+.dt-ico img { object-fit: contain; -webkit-user-drag: none; user-select: none; }
+.desktop[data-icons="aero"] .dt-icon-img :is(svg, img) { width: 44px; height: 44px; }
+.desktop[data-icons="aero"] .dt-props-head :is(svg, img) { width: 48px; height: 48px; }
+.dt-ico-stack { position: relative; display: block; width: 100%; height: 100%; }
+.dt-ico-stack img { width: 100%; height: 100%; }
+.dt-ico-stack .dt-ico-peek { position: absolute; left: 52%; top: -8%; width: 46% !important; height: 46% !important; transform: rotate(14deg); filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
+.dt-display-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #1e3557; }
+.dt-display-row span { margin-right: 4px; }
 
 /* ── Small screens: icons flow in a grid, windows fill the screen ── */
 @media (max-width: 720px) {

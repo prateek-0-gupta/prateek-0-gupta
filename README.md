@@ -189,8 +189,9 @@ The whole point of keeping this dependency-free is that forking should take less
 2. Delete `CNAME`, or replace `prat.ee` with your own domain. Leaving my domain in there will not make you me. I have tried.
 3. In the repo settings, turn on GitHub Pages from the `main` branch, root folder.
 4. Edit `k/js/pages/home.js`. The home page is a retro desktop: the `TOOLS`, `SOCIALS` and `LINKS` arrays near the top decide which icons appear and what they open (a tool in a window, an article as a document, a picture set in the viewer, a video embed, or an external link). `LINKS` land at random spots; everything else sits in columns. Dragged icons are remembered in localStorage. The About window text lives in `aboutHtml()` in the same file.
-5. Swap the title and meta tags in `k/index.html` and `404.html`. Both files, they are twins.
+5. Swap the title, description and social tags in `k/index.html`, and the JSON-LD block with your own details. `404.html` is generated from it in the next step.
 6. Add a page by creating a folder under `k/js/pages/`, exporting a function that returns HTML, and adding a route in `k/js/app.js`. Delete the projects you do not want the same way.
+7. Run `python tools/build_routes.py`. It writes a real `index.html` for every route (so deep links get a 200 and proper titles on GitHub Pages, not the 404 shell), plus `404.html`, `sitemap.xml` and `robots.txt`. `k/index.html` is the template. This is the only script in the repo and it has no dependencies.
 
 
 ## Things worth stealing
@@ -199,7 +200,7 @@ Everything is public, so take what helps.
 
 - `k/js/framework.js`: bas, a working SPA runtime with routing, hooks and DOM morphing in one file. Good for a weekend project that will not justify React. Instructions above.
 - `k/js/components/jigsaw.js`: the typography engine. Every capital letter as a hand-traced polygon, drawn to a canvas as jigsaw pieces. Useful if you want your name to look like it was cut out with kitchen scissors.
-- `k/js/pages/home.js` and `k/js/components/desktop-icons.js`: a Y2K desktop in one file. Glass windows you can drag, resize, minimise and maximise, a taskbar, a start menu, a WordPad-style document window for the articles, an Explorer-style folder and image viewer, right-click context menus, tooltips, rubber-band selection, a Recycle Bin you can actually drag things into, a wallpaper picker, and pixel icons drawn from SVG rectangles. Tools open inside windows as iframes.
+- `k/js/pages/home.js` and `k/js/components/desktop-icons.js`: a Y2K desktop in one file. Glass windows you can drag, resize, minimise and maximise, a taskbar, a start menu, a WordPad-style document window for the articles, an Explorer-style folder and image viewer, right-click context menus, tooltips, rubber-band selection, a Recycle Bin you can actually drag things into, a wallpaper picker, a boot screen, and two icon sets: glossy Aero SVGs in `k/media/svg/` and a pixel-art fallback drawn from SVG rectangles. Tools open inside windows as iframes.
 - `k/js/pages/ithinkthereforiam/lib/`: a self-contained infinite canvas. Pan and zoom, sticky notes, undo stack, localStorage persistence, a sketch layer with hit-testing, selection handles and resize, and a threads module that draws string between any two things. Each file does one job.
 - `k/js/pages/projects/bvhviewer/`: a BVH motion-capture player in three.js, if you ever need to look at mocap without opening Blender.
 - `k/js/pages/projects/p2pchat/`: WebRTC chat that finds peers through public BitTorrent trackers via Trystero, so there is no server of mine anywhere in the loop. Discovery takes a minute. Patience is a feature.
