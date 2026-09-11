@@ -6,6 +6,8 @@ import Snake from './pages/projects/snake/snake.js';
 import BVHViewer from './pages/projects/bvhviewer/bvhviewer.js';
 import IThinkThereforeIAm from './pages/ithinkthereforiam/ithinkthereforeiam.js';
 import { ArticlesIndex, ArticlePage } from './pages/articles/articles.js';
+import QRMaker from './pages/projects/qr/qr.js';
+import SealedNote from './pages/projects/share/share.js';
 import { ARTICLES } from './pages/articles/articles-data.js';
 
 function NotFound({ path }) {
@@ -25,6 +27,8 @@ const routes = {
     '/p2pchat': P2PChat,
     '/snake': Snake,
     '/bvhviewer': BVHViewer,
+    '/qr': QRMaker,
+    '/share': SealedNote,
     '/ithinkthereforeiam': IThinkThereforeIAm,
     '/ithinkthereforiam': IThinkThereforeIAm,
     '/articles': ArticlesIndex,
@@ -50,6 +54,8 @@ const PAGE_META = {
     '/snake':             { title: 'Nagmani — Prateek Gupta', description: DESCRIPTION },
     '/p2pchat':           { title: 'p2p chat — Prateek Gupta', description: DESCRIPTION },
     '/bvhviewer':         { title: 'BVH Viewer — Prateek Gupta', description: DESCRIPTION },
+    '/qr':                { title: 'QR Maker — Prateek Gupta', description: DESCRIPTION },
+    '/share':             { title: 'Sealed Note — Prateek Gupta', description: DESCRIPTION },
     '/ithinkthereforiam': { title: 'I Think Therefore I Am — Prateek Gupta', description: DESCRIPTION },
 };
 

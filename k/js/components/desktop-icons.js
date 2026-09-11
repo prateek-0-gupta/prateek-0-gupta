@@ -223,6 +223,25 @@ export const ICONS = {
         r(26, 11, 2, 2, RED) + r(24, 13, 2, 2, RED) + r(20, 17, 2, 2, RED) + r(18, 19, 2, 2, RED)
     ),
 
+    // a QR tile
+    qr: svg(
+        r(2, 2, 28, 28, K) + r(3, 3, 26, 26, W) +
+        r(5, 5, 7, 7, K) + r(6, 6, 5, 5, W) + r(7, 7, 3, 3, K) +
+        r(20, 5, 7, 7, K) + r(21, 6, 5, 5, W) + r(22, 7, 3, 3, K) +
+        r(5, 20, 7, 7, K) + r(6, 21, 5, 5, W) + r(7, 22, 3, 3, K) +
+        r(14, 5, 2, 2, K) + r(14, 9, 2, 2, K) + r(5, 14, 2, 2, K) + r(9, 14, 2, 2, K) + r(14, 14, 3, 3, K) +
+        r(19, 14, 2, 2, K) + r(23, 14, 2, 2, K) + r(14, 19, 2, 2, K) + r(14, 23, 3, 2, K) +
+        r(20, 20, 2, 2, K) + r(24, 20, 3, 2, K) + r(20, 24, 3, 3, K) + r(25, 24, 2, 3, K)
+    ),
+
+    // an envelope with a wax seal
+    seal: svg(
+        r(2, 7, 28, 18, K) + r(3, 8, 26, 16, W) +
+        r(3, 8, 26, 1, BLUE) + r(4, 9, 24, 1, BLUE) + r(5, 10, 22, 1, BLUE) + r(6, 11, 20, 1, BLUE) +
+        r(7, 12, 18, 1, BLUE) + r(8, 13, 16, 1, BLUE) + r(9, 14, 14, 1, BLUE) + r(10, 15, 12, 1, BLUE) + r(11, 16, 10, 1, BLUE) +
+        r(12, 13, 8, 8, K) + r(13, 14, 6, 6, RED) + r(14, 15, 4, 1, '#ff9a8a') + r(15, 16, 2, 2, YD)
+    ),
+
     logo: svg(
         r(5, 6, 10, 9, '#d22') + r(17, 4, 10, 9, GR) + r(5, 17, 10, 9, BLUE) + r(17, 15, 10, 9, Y) +
         r(4, 5, 1, 11, K) + r(15, 4, 1, 22, K) + r(16, 3, 1, 11, K) + r(27, 3, 1, 22, K) +
@@ -241,6 +260,7 @@ const AERO = {
     wordpad: '11-wordpad', camera: '12-camera', linkedin: '13-linkedin', mail: '14-mail',
     dataset: '15-dataset', repo: '16-repo', robot: '17-robot', bin: '18-bin', binFull: '18-bin',
     logo: '19-logo', power: '20-power', pictures: '21-pictures', viewer: '22-viewer', display: '01-computer',
+    qr: '23-qr', seal: '24-seal',
 };
 
 /**

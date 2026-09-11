@@ -14,7 +14,7 @@ import { ARROW, BUSY } from '../components/cursors.js';
 // ── Content ──────────────────────────────────────────────────────────
 
 const POSTER_DIR = 'js/pages/projects/posters/assets';
-const STORE_KEY = 'prateek-desktop-icons-v3';    // v3: the hand-arranged layout
+const STORE_KEY = 'prateek-desktop-icons-v4';    // v4: two more programs
 const BIN_KEY = 'prateek-desktop-bin-v1';
 const WALL_KEY = 'prateek-desktop-wall-v1';
 const SOUND_KEY = 'prateek-desktop-sound-v1';
@@ -50,6 +50,8 @@ const PROGRAMS = [
     { id: 'p2pchat', label: 'p2p chat',                 icon: 'chat',     kind: 'app',   href: '/p2pchat',          desc: 'a serverless p2p chat' },
     { id: 'bvh',     label: 'BVH Viewer',               icon: 'mocap',    kind: 'app',   href: '/bvhviewer',        desc: 'a BVH motion-capture file viewer' },
     { id: 'think',   label: 'I Think Therefore I Am',   icon: 'bulb',     kind: 'app',   href: '/ithinkthereforiam', desc: 'an infinite thought canvas' },
+    { id: 'qr',      label: 'QR Maker',                 icon: 'qr',       kind: 'app',   href: '/qr',               desc: 'links, Wi-Fi logins and contacts as QR codes, made in your browser' },
+    { id: 'share',   label: 'Sealed Note',              icon: 'seal',     kind: 'app',   href: '/share',            desc: 'share a password or a note as an encrypted link that no server ever sees' },
 ];
 
 const MEDIA = [
@@ -576,7 +578,7 @@ function initDesktop(items, writings) {
         // a column that would run off the bottom squeezes its rows together instead
         const column = (items, x, y0 = 12) => {
             const pitch = items.length > 1 ? Math.min(ROW, Math.floor((a.h - y0 - ICON_H - 8) / (items.length - 1))) : ROW;
-            items.forEach((it, r) => { pos[it.id] = { x, y: y0 + r * Math.max(72, pitch) }; });
+            items.forEach((it, r) => { pos[it.id] = { x, y: y0 + r * Math.max(66, pitch) }; });
         };
         const rightX = Math.max(12 + 4 * COL, a.w - 276);
         column([ABOUT, ...PROGRAMS, ...LINKS.filter(it => it.id === 'human'), ...MEDIA.filter(it => it.id !== 'music')], 12);

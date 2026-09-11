@@ -6,8 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <!-- every relative URL below resolves against /k/, including on deep links like /k/articles/x -->
     <base href="/k/">
+    <script>(function(){if(location.hash.length>1){window.__sealed=location.hash.slice(1);history.replaceState(null,"",location.pathname+location.search);}})();</script>
 
-    <title>Reverse-Engineering a No-Name ESP32 Board — Prateek Gupta</title>
+    <title>Sealed Note — Prateek Gupta</title>
     <meta name="description" content="Hi, I am Prateek, a transdisciplinary multimedia artist. I study AI and blend future media with traditional media tools, and I work as a Software Engineer at Sum Vivas Ltd.">
     <meta name="author" content="Prateek Kumar Gupta">
     <meta name="robots" content="index, follow, max-image-preview:large">
@@ -15,7 +16,7 @@
     <meta name="color-scheme" content="light">
     <meta name="application-name" content="prat.ee/k">
     <meta name="apple-mobile-web-app-title" content="prat.ee/k">
-    <link rel="canonical" href="https://prat.ee/k/articles/reverse-engineering-esp32">
+    <link rel="canonical" href="https://prat.ee/k/share">
     <link rel="manifest" href="site.webmanifest">
 
     <link rel="icon" href="media/favicon.svg" type="image/svg+xml">
@@ -24,12 +25,12 @@
     <link rel="apple-touch-icon" href="media/apple-touch-icon.png" sizes="180x180">
     <link rel="shortcut icon" href="favicon.ico">
 
-    <meta property="og:type" content="article">
+    <meta property="og:type" content="website">
     <meta property="og:site_name" content="prat.ee/k">
     <meta property="og:locale" content="en_GB">
-    <meta property="og:title" content="Reverse-Engineering a No-Name ESP32 Board — Prateek Gupta">
+    <meta property="og:title" content="Sealed Note — Prateek Gupta">
     <meta property="og:description" content="Hi, I am Prateek, a transdisciplinary multimedia artist. I study AI and blend future media with traditional media tools, and I work as a Software Engineer at Sum Vivas Ltd.">
-    <meta property="og:url" content="https://prat.ee/k/articles/reverse-engineering-esp32">
+    <meta property="og:url" content="https://prat.ee/k/share">
     <meta property="og:image" content="https://prat.ee/k/media/og.jpg">
     <meta property="og:image:secure_url" content="https://prat.ee/k/media/og.jpg">
     <meta property="og:image:type" content="image/jpeg">
@@ -37,7 +38,7 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="prat.ee/k, a retro desktop with the About Me window open">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Reverse-Engineering a No-Name ESP32 Board — Prateek Gupta">
+    <meta name="twitter:title" content="Sealed Note — Prateek Gupta">
     <meta name="twitter:description" content="Hi, I am Prateek, a transdisciplinary multimedia artist. I study AI and blend future media with traditional media tools, and I work as a Software Engineer at Sum Vivas Ltd.">
     <meta name="twitter:image" content="https://prat.ee/k/media/og.jpg">
     <meta name="twitter:image:alt" content="prat.ee/k, a retro desktop with the About Me window open">
@@ -85,18 +86,7 @@
       ]
     }
     </script>
-    <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Reverse-Engineering a No-Name ESP32 Board","description":"Hi, I am Prateek, a transdisciplinary multimedia artist. I study AI and blend future media with traditional media tools, and I work as a Software Engineer at Sum Vivas Ltd.","url":"https://prat.ee/k/articles/reverse-engineering-esp32","author":{"@type":"Person","name":"Prateek Kumar Gupta","url":"https://prat.ee/k/"},"image":"https://prat.ee/k/media/og.jpg","inLanguage":"en-GB"}</script>
-
-    <script defer src="https://cloud.umami.is/script.js" data-website-id="e3c866ee-d482-46ef-96d3-70bf1c966b2e"></script>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-HBT5N55V3R"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-HBT5N55V3R');
-    </script>
+    <!-- route-schema -->
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

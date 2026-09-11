@@ -12,6 +12,8 @@ Live at [prat.ee/k](https://prat.ee/k). No framework, no build step, no `node_mo
 - **p2p chat** (`/p2pchat`): a serverless chat over WebRTC. Your messages go from your browser to theirs and nowhere else. Like most conversations, they leave no trace.
 - **BVH Viewer** (`/bvhviewer`): drop a `.bvh` motion-capture file in and watch a skeleton do whatever the actor did that day.
 - **I Think Therefore I Am** (`/ithinkthereforiam`): an infinite canvas for dumping thoughts. Sticky notes, a kanban board, red string between ideas like a detective who has lost the plot, a sketch layer with shapes and text you can move, resize and link. Everything stays in your browser. Nothing touches a server. Nothing lasts anyway, but this at least survives a refresh.
+- **QR Maker** (`/qr`): links, Wi-Fi logins, contact cards and e-mails as QR codes, with a QR encoder written from scratch in `k/js/components/qr.js`. Nothing you type leaves the page.
+- **Sealed Note** (`/share`): type a password or a note, get a link. The note is encrypted in your browser (AES-256-GCM, optionally behind a PBKDF2 passphrase) and rides inside the link after the `#`, which browsers never send to a server. There is no backend because there is nothing to store.
 - **Digital Human** and **Digital Doppelgänger** are external links, one to work at [Sum Vivas](https://avatar.sumvivas.com) and one to a short film.
 
 **Writing**
@@ -199,6 +201,7 @@ The whole point of keeping this dependency-free is that forking should take less
 Everything is public, so take what helps.
 
 - `k/js/framework.js`: bas, a working SPA runtime with routing, hooks and DOM morphing in one file. Good for a weekend project that will not justify React. Instructions above.
+- `k/js/components/qr.js`: a QR code encoder in one file, byte mode, all 40 versions, all four error-correction levels, mask selection by the standard penalty rules, plus SVG and canvas renderers. Verified module-for-module against segno.
 - `k/js/components/jigsaw.js`: the typography engine. Every capital letter as a hand-traced polygon, drawn to a canvas as jigsaw pieces. Useful if you want your name to look like it was cut out with kitchen scissors.
 - `k/js/pages/home.js` and `k/js/components/desktop-icons.js`: a Y2K desktop in one file. Glass windows you can drag, resize, minimise and maximise, a taskbar, a start menu, a WordPad-style document window for the articles, an Explorer-style folder and image viewer, right-click context menus, tooltips, rubber-band selection, a Recycle Bin you can actually drag things into, a wallpaper picker, a boot screen, and two icon sets: glossy Aero SVGs in `k/media/svg/` and a pixel-art fallback drawn from SVG rectangles. Tools open inside windows as iframes.
 - `k/js/pages/ithinkthereforiam/lib/`: a self-contained infinite canvas. Pan and zoom, sticky notes, undo stack, localStorage persistence, a sketch layer with hit-testing, selection handles and resize, and a threads module that draws string between any two things. Each file does one job.
