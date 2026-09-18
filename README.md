@@ -16,7 +16,7 @@ Live at [prat.ee/k](https://prat.ee/k). No framework, no build step, no `node_mo
 
 **Writing**
 
-i love cinema and as a media student I wrote some long-form pieces on how cinema taught us to fear and love machines, a ranked list of AI films, and a history of AI from 1950 to now. They live in `k/js/pages/articles/articles-data.js` as plain HTML strings. The corpus study of 2,015 AI films has its own folder at `k/js/pages/articles/ai-in-cinema/` with the figures and tables beside the prose, and the write-up on reverse-engineering a £20 ESP32-S3 voice board lives in `k/js/pages/articles/aitoy/` with its photos in `figures/`.
+i love cinema and as a media student I wrote some long-form pieces on how cinema taught us to fear and love machines, a ranked list of AI films, and a history of AI from 1950 to now. `k/js/pages/articles/articles-data.js` is the index: slug, title and blurb, nothing else. Each article body is its own module exporting one plain HTML string, and it is only downloaded when someone opens it. The uni pieces are in `k/js/pages/articles/uni/`. The corpus study of 2,015 AI films has its own folder at `k/js/pages/articles/ai-in-cinema/` with the figures and tables beside the prose, and the write-up on reverse-engineering a £20 ESP32-S3 voice board lives in `k/js/pages/articles/aitoy/` with its photos in `figures/`. The build script bakes every article into a static HTML file, so the words are there for crawlers, link previews and anyone with JavaScript off.
 
 **Art**
 
@@ -28,19 +28,21 @@ I also draw and photograph things. That lives on Instagram at [@chai.and.photosh
 index.html            redirects to /k/
 404.html              same shell as k/index.html, so deep links work on GitHub Pages
 k/index.html          the app shell. Sets <base href="/k/">
-k/js/app.js           the route table
-k/js/framework.js     bas, the whole framework, about 360 lines
+k/js/app.js           boots the app
+k/js/routes.js        the route table, and what each route puts in <head>
+k/js/framework.js     bas, the whole framework, under 500 lines
 k/js/pages/           one folder per page or project
 k/css/style.css       site styles. Project pages ship their own CSS
+tools/build_routes.mjs  writes a static HTML file per route. See below
 ```
 
 `framework.js` is a small SPA runtime I wrote so I would stop rewriting one. It is called **bas**, which is Hindi for "enough", and that is the whole design brief. A page is a function that returns a template string. It gets `useState` and `useEffect`, a `data-link` attribute for client-side navigation, `data-action` for delegated click handlers, and a DOM morph on re-render so focus and scroll do not jump. That's the entire API. Read it in ten minutes, and if you find a bug, congratulations, it is now your framework too.
 
-Routing is path-based with `/k` as the base path. GitHub Pages does not know about client-side routes, so `404.html` is a copy of the app shell. Any unknown URL loads the app, which then renders the right page. Old trick, still works.
+Routing is path-based with `/k` as the base path. GitHub Pages does not know about client-side routes, so `404.html` is a copy of the app shell. Any unknown URL loads the app, which then renders the right page. Old trick, still works. Known routes get better than that: `tools/build_routes.mjs` writes a real `index.html` for each one, with its own title and social tags, and for the articles the whole page is rendered into it. bas boots on top of that HTML and morphs it in place, which for identical markup means it does nothing at all.
 
 ### bas, in slightly more detail
 
-Everything starts in `k/js/app.js`. Routes are a plain object from path to page function, and the second argument is the base path the whole site lives under:
+Everything starts in `k/js/app.js`, which hands the table in `k/js/routes.js` to bas. Routes are a plain object from path to page function, and the second argument is the base path the whole site lives under (or an options object, `{ base, origin, head }`, when you want bas to look after `<head>` too):
 
 ```js
 import Framework from './framework.js';
@@ -60,6 +62,36 @@ On load, and on every back or forward press, the router reads `location.pathname
 '/articles/:slug': ArticlePage,
 '*': NotFound,
 ```
+
+**A route can say more than which page it is.** Instead of a function, give it an object. Every key is optional except one of `page` or `load`:
+
+```js
+'/snake': {
+    load: () => import('./pages/snake.js'),      // fetched on first visit, not up front
+    head: { title: 'Nagmani — me' },             // what goes in <head> for this route
+},
+'/articles/:slug': {
+    load: () => import('./pages/articles.js').then(m => m.ArticlePage),   // a named export
+    head: ({ params }) => ({ title: titleOf(params.slug), type: 'article' }),
+    prerender: true,                              // the page returns the same HTML without a browser
+    paths: () => ARTICLES.map(a => `/articles/${a.slug}`),   // the real paths behind :slug
+},
+```
+
+- `load` makes the page lazy. Whatever is on screen stays there until the module arrives, and a page that loses a race with a newer navigation is dropped before it touches any hook state. If the import fails, which usually means a deploy swapped the files mid-visit, bas does a real page load instead.
+- `head` is `{ title, description, type, noindex }`, or a function of `{ params, path }` returning that. Pass site-wide defaults as `head` in the constructor options and bas keeps the title, description, canonical, robots and the Open Graph and Twitter tags right during client-side navigation. It only updates tags your HTML already has. Leave `head` out of the options and bas never touches `<head>`. A path that matched nothing is always `noindex`.
+- `prerender` and `paths` are for build scripts, next section.
+
+**Rendering without a browser.** A page is a function that returns a string, so nothing stops Node from calling it. bas exports two functions for that, and neither touches the DOM:
+
+```js
+import { prerender, staticPaths } from './framework.js';
+
+staticPaths(routes);      // ['/', '/snake', '/articles/one', '/articles/two', ...]
+const { html, head, url, notFound } = await prerender(routes, '/articles/one', options);
+```
+
+`head` and `url` are what the browser would set. `html` is the rendered page when the route says `prerender: true`, with `data-link` hrefs already prefixed with the base path so they work before any script runs, and `null` otherwise. Effects never run. Put `html` inside `<div id="app">` in a copy of your shell and you have a static page that bas will take over without redrawing it. For this to work the route table has to be importable outside a browser, which in practice means lazy pages, so importing the table does not import a game. `tools/build_routes.mjs` is a complete example, about a hundred lines.
 
 **A page** is a function that returns an HTML string. It receives one argument with `params`, `query` (a `URLSearchParams`), `path` and `hash`, and it may be `async` if it needs to fetch something first. It can load its own stylesheet by putting a `<link>` in the template, which is how the project pages keep their CSS out of the main file.
 
@@ -110,6 +142,9 @@ export default function Counter({ params, query }) {
 - Delegated `data-action` click handlers that survive re-renders and clear on route change.
 - `navigate(url, { replace })` for navigating from code.
 - A base path option for sites that live in a subfolder, like this one under `/k`.
+- Lazy routes: `load: () => import(...)`, so a visitor downloads the page they asked for and not the rest of the site.
+- Per-route `<head>`: title, description, canonical, robots and social tags, kept right as you navigate.
+- `prerender()` and `staticPaths()` for writing static HTML from the same pages in Node, and morphing over it on boot instead of redrawing.
 - Zero dependencies, one file, no build step. Read it in the time it takes to make tea.
 
 That is the whole thing. If you outgrow it, you will know, and the migration is copying template strings into whatever you pick next.
@@ -190,8 +225,9 @@ The whole point of keeping this dependency-free is that forking should take less
 3. In the repo settings, turn on GitHub Pages from the `main` branch, root folder.
 4. Edit `k/js/pages/home.js`. The home page is a retro desktop: the `TOOLS`, `SOCIALS` and `LINKS` arrays near the top decide which icons appear and what they open (a tool in a window, an article as a document, a picture set in the viewer, a video embed, or an external link). `LINKS` land at random spots; everything else sits in columns. Dragged icons are remembered in localStorage. The About window text lives in `aboutHtml()` in the same file.
 5. Swap the title, description and social tags in `k/index.html`, and the JSON-LD block with your own details. `404.html` is generated from it in the next step.
-6. Add a page by creating a folder under `k/js/pages/`, exporting a function that returns HTML, and adding a route in `k/js/app.js`. Delete the projects you do not want the same way.
-7. Run `python tools/build_routes.py`. It writes a real `index.html` for every route (so deep links get a 200 and proper titles on GitHub Pages, not the 404 shell), plus `404.html`, `sitemap.xml` and `robots.txt`. `k/index.html` is the template. This is the only script in the repo and it has no dependencies.
+6. Add a page by creating a folder under `k/js/pages/`, exporting a function that returns HTML, and adding a route in `k/js/routes.js` with its title. Delete the projects you do not want the same way. Set the site name, origin and description at the top of that file while you are there.
+7. Add an article by writing a module that default-exports an HTML string, and giving it a slug, title and blurb in `k/js/pages/articles/articles-data.js`. That one line puts it on the desktop, in the index, in the sitemap and at its own URL.
+8. Run `node tools/build_routes.mjs`. It imports the same route table the browser uses and writes a real `index.html` for every route (so deep links get a 200 and proper titles on GitHub Pages, not the 404 shell), with the article pages fully rendered inside, plus `404.html`, `sitemap.xml` and `robots.txt`. `k/index.html` is the template. The output is committed, so the site still deploys by pushing. This is the only script in the repo and it has no dependencies: any Node from 22 up, no `package.json`, no `node_modules`.
 
 
 ## Things worth stealing

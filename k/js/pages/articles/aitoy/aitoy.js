@@ -13,11 +13,8 @@ function photo(file, alt, caption, cls = '') {
 </figure>`;
 }
 
-export const AITOY = {
-    slug: 'reverse-engineering-esp32',
-    title: 'Reverse-Engineering a No-Name ESP32 Board',
-    blurb: 'a £20 "ai voice module" from amazon, no schematic, and an afternoon of finding out which pin does what',
-    html: `
+// Title and blurb live in ../articles-data.js; this is only the body.
+export default `
 <header class="art-header">
     <p class="art-kicker">Hardware</p>
     <h1>Reverse-Engineering a No-Name ESP32 Board</h1>
@@ -280,5 +277,4 @@ i2s_zero_dma_buffer(SPK_I2S_PORT);</code></pre>
 <p><b>INMP441 levels vary a lot between boards.</b> Some breakouts put gain in front of the I2S bus. Cheap integrated boards don't. Measure the raw peak first, then add gain in software with clipping.</p>
 
 <p>For the money the board is better than it has any right to be. The I2S routing is clean, the buttons make sense once you know where they go, and the battery circuit means a 3.7&nbsp;V LiPo would make it properly portable. It just needs someone to publish the schematic. Until then there is the table above, and the firmware, the test sketch and the serial scripts are all in <a href="${GH}" target="_blank" rel="noopener">the repo</a>.</p>
-`,
-};
+`;

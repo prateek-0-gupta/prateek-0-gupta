@@ -195,7 +195,7 @@ function docHtml(item) {
             <span class="dt-doc-btn dt-doc-align is-on">≡</span><span class="dt-doc-btn dt-doc-align">≡</span><span class="dt-doc-btn dt-doc-align">≡</span>
         </div>
         <div class="dt-doc-ruler"></div>
-        <div class="dt-doc-page"><article class="art-body">${item.article.html}</article></div>
+        <div class="dt-doc-page"><article class="art-body"><p class="art-meta">opening&hellip;</p></article></div>
     </div>`;
 }
 
@@ -998,6 +998,8 @@ function initDesktop(items, writings) {
         if (windows.has(item.id)) { openWindow(item, {}); return; }
         const rec = openWindow(item, { body: docHtml(item), w: 860, h: 640, cls: 'is-doc', full: item.href, icon: 'wordpad' });
         const page = rec.el.querySelector('.dt-doc-page');
+        // the index only knows titles; the words arrive when the document is opened
+        item.article.load().then(m => { page.querySelector('.art-body').innerHTML = m.default; });
         // links inside the document stay inside the desktop: other articles
         // open as documents, contents links scroll the page, pictures open
         // in the viewer. stopPropagation keeps the router's body handler out.

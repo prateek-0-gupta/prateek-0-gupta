@@ -5,6 +5,10 @@
 // { params, query, path, hash } and may be async. Hooks work by call order,
 // like React. Effects run after the DOM is patched and may return a cleanup,
 // which runs before the effect re-runs and when the page is left.
+//
+// A route is a page function, or an object that says a little more: where to
+// load the page from, what goes in <head>, and whether the page can be
+// rendered without a browser (see prerender() at the bottom).
 
 let hooks = [];              // hook slots for the current page
 let hookIndex = 0;
@@ -160,32 +164,73 @@ function normalizePath(p) {
 }
 
 // Routes are exact paths, or patterns with :name segments. '*' is the
-// not-found page.
+// not-found page. The value is a page function, or an object:
+//
+//   page       the page function, or
+//   load       () => import('./page.js'), called the first time the route is
+//              visited. Resolves to a module with a default export, or to
+//              the page function itself (for a named export, add a .then)
+//   head       { title, description, type, noindex } for this route, or a
+//              function of { params, path } returning that
+//   prerender  true if the page returns the same HTML without a browser
+//   paths      () => [...] the real paths behind a :param route, for build
+//              scripts. On an exact route, () => [] keeps it out of the build
 function compileRoutes(routes) {
     const exact = new Map();
     const patterns = [];
     let notFound = null;
-    for (const [key, component] of Object.entries(routes)) {
-        if (key === '*') { notFound = component; continue; }
+    for (const [key, value] of Object.entries(routes)) {
+        const route = typeof value === 'function' ? { page: value } : value;
+        if (key === '*') { notFound = route; continue; }
         const path = normalizePath(key);
-        if (!path.includes(':')) { exact.set(path, component); continue; }
+        if (!path.includes(':')) { exact.set(path, route); continue; }
         const keys = [];
         const source = path.split('/').map(seg => {
             if (!seg.startsWith(':')) return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             keys.push(seg.slice(1));
             return '([^/]+)';
         }).join('/');
-        patterns.push({ regex: new RegExp('^' + source + '$'), keys, component });
+        patterns.push({ regex: new RegExp('^' + source + '$'), keys, route });
     }
     return { exact, patterns, notFound };
 }
 
+/** A route-relative path ('/snake', no base, no trailing slash) to { path, route, params }. */
+function matchRoute(table, path) {
+    const exact = table.exact.get(path);
+    if (exact) return { path, route: exact, params: {} };
+    for (const p of table.patterns) {
+        const m = path.match(p.regex);
+        if (!m) continue;
+        const params = {};
+        p.keys.forEach((k, i) => { params[k] = decodeURIComponent(m[i + 1]); });
+        return { path, route: p.route, params };
+    }
+    return { path, route: table.notFound, params: {}, notFound: true };
+}
+
+async function loadPage(route) {
+    const m = await route.load();
+    return typeof m === 'function' ? m : m.default;
+}
+
+// Site defaults, then the route's own. A path that matched nothing is never indexed.
+function headOf(match, defaults) {
+    const h = match.route && match.route.head;
+    return { ...defaults, noindex: !!match.notFound, ...(typeof h === 'function' ? h(match) : h) };
+}
+
 export default class Framework {
-    constructor(routes, basePath = '') {
+    // options: { base, origin, head }. A plain string is taken as the base path.
+    constructor(routes, options = {}) {
+        if (typeof options === 'string') options = { base: options };
         this.routes = compileRoutes(routes);
-        this.basePath = basePath;           // e.g. '/k'
+        this.basePath = options.base || '';             // e.g. '/k'
+        this.origin = options.origin || location.origin; // for canonical URLs
+        this.head = options.head || null;   // site-wide <head> defaults; leave out and bas never touches <head>
         this.root = document.getElementById('app');
-        this.current = null;                // { path, component, params }
+        this.current = null;                // { path, route, params }
+        this._painted = false;
         this._renderId = 0;
         this._scheduled = false;
         this._observer = null;
@@ -247,25 +292,14 @@ export default class Framework {
     resolve(pathname) {
         let path = pathname;
         if (this.isInBasePath(path)) path = path.slice(this.basePath.length) || '/';
-        path = normalizePath(path);
-
-        const exact = this.routes.exact.get(path);
-        if (exact) return { path, component: exact, params: {} };
-        for (const p of this.routes.patterns) {
-            const m = path.match(p.regex);
-            if (!m) continue;
-            const params = {};
-            p.keys.forEach((k, i) => { params[k] = decodeURIComponent(m[i + 1]); });
-            return { path, component: p.component, params };
-        }
-        return { path, component: this.routes.notFound, params: {}, notFound: true };
+        return matchRoute(this.routes, normalizePath(path));
     }
 
     async handleRoute(reason = 'push') {
         const match = this.resolve(location.pathname);
         const changed = !this.current
             || this.current.path !== match.path
-            || this.current.component !== match.component;
+            || this.current.route !== match.route;
         if (changed) {
             unmountPage();
             if (this._observer) { this._observer.disconnect(); this._observer = null; }
@@ -299,10 +333,26 @@ export default class Framework {
         const id = ++this._renderId;
         const gen = pageGen;
         const match = this.current;
-        hookIndex = 0;
+        const route = match.route;
+
+        // a lazy page: fetch it once. Whatever is on screen (the previous
+        // page, or prerendered HTML on a deep link) stays up until it arrives.
+        if (route && !route.page) {
+            try {
+                route.page = await loadPage(route);
+            } catch (err) {
+                console.error('[framework] could not load the page for', match.path, err);
+                // most likely a deploy swapped the files under us, and a real
+                // page load sorts that out. Not on first paint, or it would loop.
+                if (this._painted) location.reload();
+                return;
+            }
+            if (id !== this._renderId || gen !== pageGen) return;
+        }
+        hookIndex = 0;      // after the await, so a page that lost the race never touches hook slots
 
         let viewHtml;
-        if (!match.component) {
+        if (!route) {
             viewHtml = `<h1>404 - Not Found</h1><p>The requested path ${match.path} does not exist.</p>`;
         } else {
             const ctx = {
@@ -311,11 +361,13 @@ export default class Framework {
                 path: match.path,
                 hash: location.hash,
             };
-            viewHtml = await match.component(ctx);
+            viewHtml = await route.page(ctx);
         }
         // a newer render or a route change overtook this one while it awaited
         if (id !== this._renderId || gen !== pageGen) return;
 
+        // Prerendered HTML in #app takes the morph path like any re-render; it
+        // is the same string, so nothing moves and nothing flashes.
         const activeId = document.activeElement?.id;
         if (!this.root.hasChildNodes()) {
             this.root.innerHTML = viewHtml;
@@ -329,10 +381,35 @@ export default class Framework {
             if (el && typeof el.focus === 'function') el.focus();
         }
 
+        this._painted = true;
         this.decorateLinks();
+        this.applyHead(match);
         flushEffects();
         this.afterRender();
         if (typeof this.onRender === 'function') this.onRender(match);
+    }
+
+    // Keep <head> right during client-side navigation: title, description,
+    // canonical, robots and the social tags. It only updates tags the shell
+    // already has. Crawlers get the same values baked in by the build script.
+    applyHead(match) {
+        if (!this.head) return;
+        const head = headOf(match, this.head);
+        const url = this.origin + this.basePath + (match.path === '/' ? '/' : match.path);
+        const set = (selector, attr, value) => {
+            const el = document.head.querySelector(selector);
+            if (el && value != null) el.setAttribute(attr, value);
+        };
+        if (head.title) document.title = head.title;
+        set('meta[name="description"]', 'content', head.description);
+        set('meta[name="robots"]', 'content', head.noindex ? 'noindex, follow' : (head.robots || 'index, follow'));
+        set('link[rel="canonical"]', 'href', url);
+        set('meta[property="og:title"]', 'content', head.title);
+        set('meta[property="og:description"]', 'content', head.description);
+        set('meta[property="og:url"]', 'content', url);
+        set('meta[property="og:type"]', 'content', head.type || 'website');
+        set('meta[name="twitter:title"]', 'content', head.title);
+        set('meta[name="twitter:description"]', 'content', head.description);
     }
 
     // Give data-links real hrefs (so open-in-new-tab and copy-link work) and
@@ -363,4 +440,49 @@ export default class Framework {
         }
         this.root.querySelectorAll('.reveal:not(.visible)').forEach(el => this._observer.observe(el));
     }
+}
+
+// ── Without a browser ────────────────────────────────────────────────
+// For build scripts. Nothing below touches the DOM, so Node can import this
+// file and the route table and write real HTML for crawlers, link previews
+// and anyone with JavaScript off. bas then morphs over that HTML on boot.
+
+/** Every concrete path the routes stand for: exact paths, plus paths() of the :param ones. */
+export function staticPaths(routes) {
+    const out = [];
+    for (const [key, value] of Object.entries(routes)) {
+        if (key === '*') continue;
+        if (typeof value.paths === 'function') out.push(...value.paths());
+        else if (!key.includes(':')) out.push(key);
+    }
+    return [...new Set(out.map(normalizePath))];
+}
+
+/**
+ * What a route-relative path comes to: { path, params, notFound, head, url, html }.
+ * head and url are what applyHead() would set in a browser. html is the page
+ * itself when the route says prerender: true, with data-link hrefs already
+ * given their base path, and null otherwise. Effects never run here.
+ * Takes the same options as the constructor; origin is required.
+ */
+export async function prerender(routes, path, options = {}) {
+    const base = options.base || '';
+    const match = matchRoute(compileRoutes(routes), normalizePath(path));
+    const head = headOf(match, options.head);
+    const url = options.origin + base + (match.path === '/' ? '/' : match.path);
+
+    let html = null;
+    if (match.route && match.route.prerender) {
+        const page = match.route.page || (match.route.page = await loadPage(match.route));
+        hooks = []; hookIndex = 0; pendingEffects = [];
+        html = await page({ params: match.params, query: new URLSearchParams(), path: match.path, hash: '' });
+        hooks = []; pendingEffects = [];
+        // what decorateLinks() does in a browser, so the links work before bas boots
+        if (base) {
+            html = html.replace(/<a\b[^>]*\bdata-link\b[^>]*>/g, tag =>
+                tag.replace(/\bhref="(\/[^"]*)"/, (m, href) =>
+                    href === base || href.startsWith(base + '/') ? m : `href="${base}${href}"`));
+        }
+    }
+    return { ...match, head, url, html };
 }

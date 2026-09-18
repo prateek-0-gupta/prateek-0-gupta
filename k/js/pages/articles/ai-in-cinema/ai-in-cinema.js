@@ -8,11 +8,8 @@ const P = 'js/pages/articles/ai-in-cinema/posters';
 const HF = 'https://huggingface.co/prateek-0-gupta';
 const GH = 'https://github.com/prateek-0-gupta/allaimovies';
 
-export const AI_IN_CINEMA = {
-    slug: 'ai-in-cinema',
-    title: 'The Machine on Screen',
-    blurb: 'i tested five things i had written about AI in cinema against 2,015 films. three were wrong',
-    html: `
+// Title and blurb live in ../articles-data.js; this is only the body.
+export default `
 <header class="art-header">
     <p class="art-kicker">Research</p>
     <h1>The Machine on Screen</h1>
@@ -582,5 +579,4 @@ export const AI_IN_CINEMA = {
     <li><a href="https://www.themoviedb.org" target="_blank" rel="noopener">The Movie Database (TMDB) API</a>. Accessed 2026.</li>
     <li><a href="https://datasets.imdbws.com" target="_blank" rel="noopener">IMDb Non-Commercial Datasets</a>, title.ratings.tsv.gz. Accessed 2026.</li>
 </ul>
-`,
-};
+`;

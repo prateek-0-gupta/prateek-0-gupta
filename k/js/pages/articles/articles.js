@@ -1,4 +1,4 @@
-import { ARTICLES, getArticle } from './articles-data.js';
+import { ARTICLES, loadArticle } from './articles-data.js';
 
 export function ArticlesIndex() {
     return `
@@ -20,9 +20,12 @@ export function ArticlesIndex() {
     `;
 }
 
-// Routed as /articles/:slug. The slug arrives in params.
-export function ArticlePage({ params }) {
-    const article = getArticle(params.slug);
+// Routed as /articles/:slug. The slug arrives in params. Async because the
+// body is its own module: bas keeps the previous page up until it resolves,
+// and on a deep link the text is already in the HTML (tools/build_routes.mjs
+// bakes it in), so there is nothing to wait for on screen either way.
+export async function ArticlePage({ params }) {
+    const article = await loadArticle(params.slug);
     if (!article) {
         return `<div class="articles-page"><div class="art-nav"><a href="/articles" data-link>&larr; writings</a></div><h1>Article not found</h1></div>`;
     }
