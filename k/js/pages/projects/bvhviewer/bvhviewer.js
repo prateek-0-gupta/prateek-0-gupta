@@ -46,6 +46,17 @@ export default function BVHViewer() {
         }
     });
 
+    registerHandler('bvh-toggle-mesh', () => {
+        // FBX and glTF files usually carry a skinned mesh; BVH never does.
+        // Mesh and sticks are shown one at a time: sticks sized for a bare
+        // skeleton poke through the skin wherever a limb is thinner than they are
+        for (const s of window._bvhState?.skeletons || []) {
+            if (!s.meshes.length) continue;
+            s.showSticks = !s.showSticks;
+            for (const m of s.meshes) m.visible = !s.showSticks;
+        }
+    });
+
     registerHandler('bvh-toggle-info', () => {
         const panel = document.getElementById('bvh-skeleton-panel');
         if (panel) panel.classList.toggle('bvh-panel-visible');
@@ -67,6 +78,7 @@ export default function BVHViewer() {
                 <button data-action="bvh-reset-camera" class="bvh-tool-btn">Reset View</button>
                 <button data-action="bvh-toggle-grid" class="bvh-tool-btn">Grid</button>
                 <button data-action="bvh-toggle-skeleton" class="bvh-tool-btn">Lines</button>
+                <button data-action="bvh-toggle-mesh" class="bvh-tool-btn">Mesh</button>
                 <button data-action="bvh-toggle-info" class="bvh-tool-btn">Info</button>
             </div>
         </div>
@@ -75,7 +87,7 @@ export default function BVHViewer() {
             <div id="bvh-canvas-wrap" class="bvh-canvas-wrap">
                 <div id="bvh-drop-zone" class="bvh-drop-zone">
                     <div class="bvh-drop-icon">/\\/\\</div>
-                    <p class="bvh-drop-text">Drag and drop <strong>.bvh</strong> files here</p>
+                    <p class="bvh-drop-text">Drag and drop <strong>.bvh</strong>, <strong>.fbx</strong>, <strong>.glb</strong> or <strong>.gltf</strong> files here</p>
                     <p class="bvh-drop-hint">or use the Add File button above</p>
                     <p class="bvh-drop-format">Load multiple files to compare animations side by side</p>
                 </div>
@@ -99,10 +111,10 @@ export default function BVHViewer() {
             <span id="bvh-time-info"></span>
         </div>
 
-        <input type="file" id="bvh-file-input" accept=".bvh" multiple style="display:none" />
+        <input type="file" id="bvh-file-input" accept="${ACCEPT}" multiple style="display:none" />
 
         <div class="bvh-footer-note">
-            Three.js BVH viewer. Load multiple motion capture files to compare side by side.
+            Three.js motion viewer for BVH, FBX and glTF. Load multiple motion capture files to compare side by side.
         </div>
     </div>`;
 }
@@ -110,12 +122,24 @@ export default function BVHViewer() {
 function buildBoneTree(bone, depth = 0) {
     const indent = '&nbsp;'.repeat(depth * 3);
     const prefix = depth === 0 ? '' : '|-- ';
-    let html = `<div class="bvh-bone-row" style="opacity:${Math.max(0.4, 1 - depth * 0.08)}">${indent}${prefix}${bone.name || 'unnamed'}</div>`;
+    let html = `<div class="bvh-bone-row" style="opacity:${Math.max(0.4, 1 - depth * 0.08)}">${indent}${prefix}${esc(bone.name || 'unnamed')}</div>`;
     for (const child of bone.children) {
         if (child.isBone) html += buildBoneTree(child, depth + 1);
     }
     return html;
 }
+
+// file names and bone names come from the user's files, so escape them before innerHTML
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* ── Supported formats ── */
+const FORMATS = ['bvh', 'fbx', 'glb', 'gltf'];
+const ACCEPT = FORMATS.map(f => '.' + f).join(',');
+const extOf = name => name.split('.').pop().toLowerCase();
+
+// Files in metres (glTF) or odd units get scaled so every skeleton stands about
+// this tall, which is what the camera, grid and spacing are tuned for (cm-ish)
+const TARGET_HEIGHT = 170;
 
 /* ── Skeleton entry colors for distinguishing multiple skeletons ── */
 const SKEL_COLORS = [
@@ -133,6 +157,31 @@ async function initBVHScene(container) {
     const { BVHLoader } = await import('https://esm.sh/three@0.170.0/examples/jsm/loaders/BVHLoader.js');
     const { CSS2DRenderer, CSS2DObject } = await import('https://esm.sh/three@0.170.0/examples/jsm/renderers/CSS2DRenderer.js');
 
+    // FBX and glTF loaders are only fetched the first time someone drops one of those files
+    let fbxLoader = null, gltfLoader = null;
+    const getFBXLoader = async () => fbxLoader ??= new (await import('https://esm.sh/three@0.170.0/examples/jsm/loaders/FBXLoader.js')).FBXLoader();
+    // glTF files from optimisers (gltfpack, gltf-transform, Blender's export
+    // options) are often compressed: meshopt or Draco geometry, KTX2 textures.
+    // Each needs its decoder registered before parse, or the loader throws
+    let dracoLoader = null, ktx2Loader = null;
+    const getGLTFLoader = async () => {
+        if (gltfLoader) return gltfLoader;
+        const THREE_JSM = 'https://esm.sh/three@0.170.0/examples/jsm';
+        const THREE_LIBS = 'https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/libs';   // wasm/worker files, fetched by URL
+        const [{ GLTFLoader }, { DRACOLoader }, { KTX2Loader }, { MeshoptDecoder }] = await Promise.all([
+            import(`${THREE_JSM}/loaders/GLTFLoader.js`),
+            import(`${THREE_JSM}/loaders/DRACOLoader.js`),
+            import(`${THREE_JSM}/loaders/KTX2Loader.js`),
+            import(`${THREE_JSM}/libs/meshopt_decoder.module.js`),
+        ]);
+        dracoLoader = new DRACOLoader().setDecoderPath(`${THREE_LIBS}/draco/gltf/`);
+        ktx2Loader = new KTX2Loader().setTranscoderPath(`${THREE_LIBS}/basis/`).detectSupport(renderer);
+        return gltfLoader = new GLTFLoader()
+            .setDRACOLoader(dracoLoader)
+            .setKTX2Loader(ktx2Loader)
+            .setMeshoptDecoder(MeshoptDecoder);
+    };
+
     const width = container.clientWidth;
     const height = container.clientHeight;
 
@@ -143,7 +192,7 @@ async function initBVHScene(container) {
     camera.position.set(0, 100, 300);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setSize(width, height);
+    renderer.setSize(width, height, false);   // no inline px size, so the canvas can't hold its box open
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -211,6 +260,7 @@ async function initBVHScene(container) {
     const skeletons = [];   // array of skeleton entries
     let selectedId = null;
     let idCounter = 0;
+    let disposed = false;   // set by cleanup; files still parsing are dropped
     const clock = new THREE.Clock();
 
     const _v1 = new THREE.Vector3();
@@ -256,7 +306,7 @@ async function initBVHScene(container) {
             _dir.subVectors(_v2, _v1);
             const len = _dir.length();
             if (len < 0.001) { cyl.visible = false; continue; }
-            cyl.visible = true;
+            cyl.visible = entry.showSticks;
             cyl.position.copy(_v1);
             _dir.normalize();
             _quat.setFromUnitVectors(_up, _dir);
@@ -267,7 +317,14 @@ async function initBVHScene(container) {
         for (const jm of entry.joints) {
             jm.userData.bone.getWorldPosition(_v1);
             jm.position.copy(_v1);
+            jm.visible = entry.showSticks;
             jm.scale.setScalar(jm.userData.radius || 1.2);
+        }
+        // the label lives in the scene, not under the head bone, so bone and
+        // container scales (glTF, many FBX rigs) don't shrink its offset
+        if (entry.headLabel) {
+            entry.headBone.getWorldPosition(entry.headLabel.position);
+            entry.headLabel.position.y += entry.meshes.length ? 24 : 8;   // mesh rigs' head bone is mid-skull
         }
     }
 
@@ -290,8 +347,10 @@ async function initBVHScene(container) {
             const jm = new THREE.Mesh(jointGeo, jntMat);
             jm.castShadow = true;
             jm.userData.bone = bone;
+            // measured in world space so scaled rigs get sensibly sized joints
             let avgLen = 0, cc = 0;
-            for (const c of bone.children) { if (c.isBone) { avgLen += c.position.length(); cc++; } }
+            bone.getWorldPosition(_v1);
+            for (const c of bone.children) { if (c.isBone) { avgLen += c.getWorldPosition(_v2).distanceTo(_v1); cc++; } }
             jm.userData.radius = cc > 0 ? Math.max(0.8, (avgLen / cc) * 0.12) : 0.8;
             scene.add(jm);
             entry.joints.push(jm);
@@ -322,8 +381,7 @@ async function initBVHScene(container) {
             if (pos.y < minY) minY = pos.y;
             for (const c of bone.children) { if (c.isBone) walkMin(c); }
         }
-        const root = cont.children[0];
-        if (root) walkMin(root);
+        walkMin(entry.rootBone);
         if (isFinite(minY)) {
             cont.position.y = -minY;
             cont.updateMatrixWorld(true);
@@ -338,13 +396,11 @@ async function initBVHScene(container) {
         for (const entry of skeletons) {
             groundEntry(entry);
             entry.container.updateMatrixWorld(true);
-            const root = entry.container.children[0];
-            if (!root) continue;
             (function walk(bone) {
                 bone.getWorldPosition(pos);
                 bbox.expandByPoint(pos);
                 for (const c of bone.children) { if (c.isBone) walk(c); }
-            })(root);
+            })(entry.rootBone);
         }
         if (bbox.isEmpty()) return;
         const center = bbox.getCenter(new THREE.Vector3());
@@ -365,18 +421,7 @@ async function initBVHScene(container) {
     function removeEntry(id) {
         const idx = skeletons.findIndex(e => e.id === id);
         if (idx === -1) return;
-        const entry = skeletons[idx];
-        // Remove 3D objects
-        for (const cyl of entry.cylinders) scene.remove(cyl);
-        for (const jm of entry.joints) scene.remove(jm);
-        if (entry.skeletonHelper) scene.remove(entry.skeletonHelper);
-        if (entry.container) scene.remove(entry.container);
-        if (entry.headLabel) {
-            if (entry.headLabel.parent) entry.headLabel.parent.remove(entry.headLabel);
-            scene.remove(entry.headLabel);
-        }
-        entry.cylMat?.dispose();
-        entry.jntMat?.dispose();
+        disposeEntry(skeletons[idx]);
         skeletons.splice(idx, 1);
         if (selectedId === id) selectedId = skeletons.length > 0 ? skeletons[0].id : null;
         // Re-position remaining skeletons
@@ -387,6 +432,26 @@ async function initBVHScene(container) {
             const dz = document.getElementById('bvh-drop-zone');
             if (dz) dz.style.display = '';
         }
+    }
+
+    /* ── Take an entry's objects out of the scene and free GPU memory ── */
+    function disposeEntry(entry) {
+        for (const cyl of entry.cylinders) scene.remove(cyl);
+        for (const jm of entry.joints) scene.remove(jm);
+        if (entry.skeletonHelper) { scene.remove(entry.skeletonHelper); entry.skeletonHelper.dispose(); }
+        if (entry.headLabel) { scene.remove(entry.headLabel); entry.headLabel.element.remove(); }
+        entry.mixer.stopAllAction();
+        scene.remove(entry.container);
+        // the loaded model's own meshes, materials and textures (FBX/glTF)
+        entry.container.traverse(o => {
+            o.geometry?.dispose();
+            for (const m of [].concat(o.material || [])) {
+                for (const v of Object.values(m)) if (v?.isTexture) v.dispose();
+                m.dispose();
+            }
+        });
+        entry.cylMat?.dispose();
+        entry.jntMat?.dispose();
     }
 
     /* ── Spread skeletons along X axis so they don't overlap ── */
@@ -419,7 +484,7 @@ async function initBVHScene(container) {
             const sel = entry.id === selectedId ? ' bvh-skel-item-selected' : '';
             return `<div class="bvh-skel-item${sel}" data-skel-id="${entry.id}">
                 <span class="bvh-skel-dot" style="background:${hexCol}"></span>
-                <span class="bvh-skel-name">${entry.fileName}</span>
+                <span class="bvh-skel-name">${esc(entry.fileName)}</span>
                 <span class="bvh-skel-meta">${entry.boneCount}b / ${entry.duration.toFixed(1)}s</span>
                 <button class="bvh-skel-remove" data-remove-id="${entry.id}">x</button>
             </div>`;
@@ -449,10 +514,12 @@ async function initBVHScene(container) {
             dataPanel.innerHTML = '<p class="bvh-panel-empty">Select a skeleton</p>';
             return;
         }
-        const rootBone = entry.container.children[0];
+        const rootBone = entry.rootBone;
         dataPanel.innerHTML = `
             <div class="bvh-data-grid">
-                <div class="bvh-data-item"><span class="bvh-data-label">File</span><span class="bvh-data-value">${entry.fileName}</span></div>
+                <div class="bvh-data-item"><span class="bvh-data-label">File</span><span class="bvh-data-value">${esc(entry.fileName)}</span></div>
+                <div class="bvh-data-item"><span class="bvh-data-label">Format</span><span class="bvh-data-value">${entry.format.toUpperCase()}</span></div>
+                <div class="bvh-data-item"><span class="bvh-data-label">Clip</span><span class="bvh-data-value">${esc(entry.clipName)}${entry.clipCount > 1 ? ` (1 of ${entry.clipCount})` : ''}</span></div>
                 <div class="bvh-data-item"><span class="bvh-data-label">Bones</span><span class="bvh-data-value">${entry.boneCount}</span></div>
                 <div class="bvh-data-item"><span class="bvh-data-label">Duration</span><span class="bvh-data-value">${entry.duration.toFixed(2)}s</span></div>
                 <div class="bvh-data-item"><span class="bvh-data-label">Frames</span><span class="bvh-data-value">${entry.frames}</span></div>
@@ -480,12 +547,68 @@ async function initBVHScene(container) {
         }
     }
 
-    /* ── Load a BVH file as a new skeleton entry ── */
-    function loadBVHData(text, fileName) {
-        const loader = new BVHLoader();
-        const result = loader.parse(text);
-        const rootBone = result.skeleton.bones[0];
-        const clip = result.clip;
+    /* ── Parse a file into { model, rootBone, clips }, whatever its format ── */
+    // model is what goes in the scene (the bare root bone for BVH, the whole
+    // loaded scene for FBX/glTF); the mixer is rooted on it so track names resolve
+    async function parseFile(file) {
+        const format = extOf(file.name);
+        if (format === 'bvh') {
+            const result = new BVHLoader().parse(await file.text());
+            const rootBone = result.skeleton.bones[0];
+            return { format, model: rootBone, rootBone, clips: [result.clip] };
+        }
+        let model, clips;
+        if (format === 'fbx') {
+            model = (await getFBXLoader()).parse(await file.arrayBuffer(), '');
+            clips = model.animations;
+        } else if (format === 'glb' || format === 'gltf') {
+            const loader = await getGLTFLoader();
+            const data = format === 'glb' ? await file.arrayBuffer() : await file.text();
+            // a .gltf that points at a separate .bin or textures can't be resolved
+            // from a single dropped file; .glb or an embedded .gltf is needed
+            const gltf = await new Promise((res, rej) => loader.parse(data, '', res, rej));
+            model = gltf.scene;
+            clips = gltf.animations;
+        } else {
+            throw new Error(`.${format} is not supported`);
+        }
+        const rootBone = findRootBone(model);
+        if (!rootBone) throw new Error('no skeleton in this file');
+        return { format, model, rootBone, clips };
+    }
+
+    /* ── The top-level bone with the most descendants (skips stray helper bones) ── */
+    function findRootBone(model) {
+        let best = null, bestCount = -1;
+        model.traverse(o => {
+            if (!o.isBone || o.parent?.isBone) return;
+            let n = 0;
+            o.traverse(c => { if (c.isBone) n++; });
+            if (n > bestCount) { bestCount = n; best = o; }
+        });
+        return best;
+    }
+
+    /* ── Load any supported file as a new skeleton entry ── */
+    async function loadFile(file) {
+        const statusEl = document.getElementById('bvh-status');
+        if (statusEl) statusEl.textContent = `Loading ${file.name}...`;
+        let parsed;
+        try {
+            parsed = await parseFile(file);
+        } catch (err) {
+            console.error(err);
+            if (statusEl) statusEl.textContent = `Could not load ${file.name}: ${err?.message || err}`;
+            return;
+        }
+        if (disposed) return;   // page left while parsing
+        addEntry(parsed, file.name);
+    }
+
+    function addEntry({ format, model, rootBone, clips }, fileName) {
+        // play the longest clip: FBX exports often carry a zero-length bind-pose take first
+        const clip = clips.reduce((a, b) => (b.duration > (a?.duration ?? -1) ? b : a), null)
+            || new THREE.AnimationClip('none', 0, []);
 
         const id = ++idCounter;
         const colorIndex = (id - 1) % SKEL_COLORS.length;
@@ -499,27 +622,55 @@ async function initBVHScene(container) {
 
         // Bone container
         const boneContainer = new THREE.Group();
-        boneContainer.add(rootBone);
+        boneContainer.add(model);
         scene.add(boneContainer);
 
+        // skinned meshes from FBX/glTF; frustum culling is off because their
+        // bounding spheres are computed in bind pose, not where the animation puts them
+        const meshes = [];
+        model.traverse(o => {
+            if (!o.isMesh) return;
+            o.castShadow = true;
+            o.frustumCulled = false;
+            meshes.push(o);
+        });
+
         // Mixer
-        const mixer = new THREE.AnimationMixer(rootBone);
+        const mixer = new THREE.AnimationMixer(model);
         const action = mixer.clipAction(clip);
         action.play();
+
+        // scale to a common height so metre-based files aren't specks next to cm-based ones
+        mixer.update(0);
+        boneContainer.updateMatrixWorld(true);
+        const height = boneHeight(rootBone);
+        if (height > 0 && (height < 50 || height > 500)) {
+            boneContainer.scale.setScalar(TARGET_HEIGHT / height);
+            boneContainer.updateMatrixWorld(true);
+        }
+
+        const longest = clip.tracks.reduce((n, t) => Math.max(n, t.times.length), 0);
+        let boneCount = 0;
+        rootBone.traverse(o => { if (o.isBone) boneCount++; });
 
         const entry = {
             id,
             fileName,
+            format,
             colorIndex,
             skeletonHelper,
             container: boneContainer,
+            rootBone,
+            meshes,
             mixer,
             action,
             clip,
-            boneCount: result.skeleton.bones.length,
+            clipName: clip.name || 'unnamed',
+            clipCount: clips.length,
+            boneCount,
             duration: clip.duration,
-            frames: clip.tracks.length > 0 ? clip.tracks[0].times.length : 0,
-            fps: clip.tracks.length > 0 ? Math.round(clip.tracks[0].times.length / clip.duration) : 0,
+            frames: longest,
+            fps: clip.duration > 0 ? Math.round((longest - 1) / clip.duration) : 0,
             tracks: clip.tracks.length,
             cylinders: [],
             joints: [],
@@ -532,14 +683,17 @@ async function initBVHScene(container) {
         // Build visual meshes
         buildVisuals(entry, rootBone);
 
-        // Find head bone and attach label
-        mixer.update(0);
-        boneContainer.updateMatrixWorld(true);
+        // a file with a mesh opens on the mesh alone; the thin lines draw over
+        // everything (no depth test), so they start hidden too and "Lines" brings them back
+        entry.showSticks = meshes.length === 0;
+        if (meshes.length) skeletonHelper.visible = false;
+
+        // Find head bone and add its label
         const headBone = findHeadBone(rootBone);
         entry.headBone = headBone;
         const col = SKEL_COLORS[colorIndex % SKEL_COLORS.length];
         const label = createHeadLabel(fileName, col.color);
-        headBone.add(label);
+        scene.add(label);
         entry.headLabel = label;
 
         skeletons.push(entry);
@@ -567,6 +721,18 @@ async function initBVHScene(container) {
         }, 100);
     }
 
+    /* ── Vertical extent of a bone hierarchy, in world units ── */
+    function boneHeight(rootBone) {
+        let lo = Infinity, hi = -Infinity;
+        rootBone.traverse(o => {
+            if (!o.isBone) return;
+            o.getWorldPosition(_v1);
+            lo = Math.min(lo, _v1.y);
+            hi = Math.max(hi, _v1.y);
+        });
+        return hi - lo;
+    }
+
     /* ── Global state ── */
     const state = {
         playing: true,
@@ -591,12 +757,7 @@ async function initBVHScene(container) {
     const fileInput = document.getElementById('bvh-file-input');
     if (fileInput) {
         fileInput.addEventListener('change', (e) => {
-            for (const file of e.target.files) {
-                if (!file.name.endsWith('.bvh')) continue;
-                const reader = new FileReader();
-                reader.onload = (ev) => loadBVHData(ev.target.result, file.name);
-                reader.readAsText(file);
-            }
+            loadFiles(e.target.files);
             fileInput.value = '';
         });
     }
@@ -606,24 +767,30 @@ async function initBVHScene(container) {
     container.addEventListener('drop', (e) => {
         e.preventDefault(); e.stopPropagation();
         container.classList.remove('bvh-dragover');
-        for (const file of e.dataTransfer.files) {
-            if (!file.name.endsWith('.bvh')) continue;
-            const reader = new FileReader();
-            reader.onload = (ev) => loadBVHData(ev.target.result, file.name);
-            reader.readAsText(file);
-        }
+        loadFiles(e.dataTransfer.files);
     });
 
+    function loadFiles(files) {
+        for (const file of files) {
+            if (FORMATS.includes(extOf(file.name))) loadFile(file);
+        }
+    }
+
     /* ── Resize ── */
+    // Watches the container, not the window: the Info panel, the mobile column
+    // layout and devtools all change its size without a window resize, and a
+    // canvas left at a stale size puts the scene off-centre or off-screen
     function onResize() {
         const w = container.clientWidth;
         const h = container.clientHeight;
+        if (!w || !h) return;   // hidden or mid-layout; the observer fires again
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
+        renderer.setSize(w, h, false);   // CSS sizes the canvas; this sets its pixels
         labelRenderer.setSize(w, h);
     }
-    window.addEventListener('resize', onResize);
+    const resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(container);
 
     /* ── Animation loop ── */
     let animId = null;
@@ -645,18 +812,13 @@ async function initBVHScene(container) {
 
     /* ── Cleanup ── */
     return function cleanup() {
-        window.removeEventListener('resize', onResize);
+        disposed = true;
+        resizeObserver.disconnect();
         if (animId) cancelAnimationFrame(animId);
-        for (const entry of skeletons) {
-            for (const cyl of entry.cylinders) scene.remove(cyl);
-            for (const jm of entry.joints) scene.remove(jm);
-            if (entry.skeletonHelper) scene.remove(entry.skeletonHelper);
-            if (entry.container) scene.remove(entry.container);
-            if (entry.headLabel) { if (entry.headLabel.parent) entry.headLabel.parent.remove(entry.headLabel); }
-            entry.cylMat?.dispose();
-            entry.jntMat?.dispose();
-        }
+        for (const entry of skeletons) disposeEntry(entry);
         skeletons.length = 0;
+        dracoLoader?.dispose();   // both hold worker threads
+        ktx2Loader?.dispose();
         cylinderGeo.dispose();
         jointGeo.dispose();
         renderer.dispose();

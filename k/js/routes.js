@@ -2,8 +2,7 @@
 // tools/build_routes.mjs read it, so this file must stay importable outside
 // a browser: every page is a lazy import, nothing here touches the DOM, and
 // the only thing pulled in eagerly is the article index (titles, no bodies).
-// Lazy pages also mean the desktop does not download the snake game, and a
-// tool opened in a window downloads only itself.
+// Lazy pages also mean the home page does not download the snake game.
 
 import { ARTICLES, getArticle } from './pages/articles/articles-data.js';
 
