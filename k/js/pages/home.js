@@ -1,95 +1,104 @@
-// Home: one page, one index. The name set in jigsaw type, then everything on
-// the site as a numbered list: things I made, things I put out, things I wrote.
+// Home: plain text, and Mooli in the margin, gesturing at it.
+// It waves when you arrive, beats on the stressed words as if it were saying
+// the intro, goes to and points at whatever you hover, and for a few projects
+// does something more particular. The page never mentions it.
 
 import { useEffect } from '../framework.js';
 import { ARTICLES } from './articles/articles-data.js';
-import { initJigsawTypography } from '../components/jigsaw.js';
+import { ensureMooli } from '../components/mooli.js';
 
-const PROJECTS = [
-    { title: 'Nagmani',               desc: 'an Indian gothic snake game',              href: '/snake',                        tag: 'game' },
-    { title: 'Digital Human',         desc: 'three.js based AI-driven Digital Human',   href: 'https://avatar.sumvivas.com',   tag: 'ai', external: true },
-    { title: 'Digital Doppelgänger',  desc: 'a short film',                             href: 'https://youtu.be/xPZ85jpZTsw',  tag: 'film', external: true },
-    { title: 'p2p chat',              desc: 'a serverless p2p chat',                    href: '/p2pchat',                      tag: 'web' },
-    { title: 'BVH Viewer',            desc: 'a BVH motion-capture file viewer',         href: '/bvhviewer',                    tag: '3d tool' },
-    { title: 'I Think Therefore I Am', desc: 'an infinite thought canvas',              href: '/ithinkthereforiam',            tag: 'tool' },
+// gesture: what the figure does while this one has its attention (point if unset)
+const MADE = [
+    { title: 'Nagmani',                desc: 'an Indian gothic snake game',              href: '/snake',                       gesture: 'snake' },
+    { title: 'Digital Human',          desc: 'a three.js, AI-driven digital human',      href: 'https://avatar.sumvivas.com',  gesture: 'wave', external: true },
+    { title: 'Digital Doppelgänger',   desc: 'a short film',                             href: 'https://youtu.be/xPZ85jpZTsw', gesture: 'frame', external: true },
+    { title: 'p2p chat',               desc: 'a chat with no server',                    href: '/p2pchat',                     gesture: 'exchange' },
+    { title: 'BVH Viewer',             desc: 'for motion-capture files',                 href: '/bvhviewer',                   gesture: 'tpose' },
+    { title: 'I Think Therefore I Am', desc: 'an infinite thought canvas',               href: '/ithinkthereforiam',           gesture: 'think' },
 ];
 
-// a song and two datasets, all living somewhere else
-const RELEASES = [
-    { title: 'Monsoon Protocol', desc: 'a song, on SoundCloud',                          href: 'https://soundcloud.com/prateek-gupta-505317056/2026-09-07t16_31_11-216z', tag: 'music', external: true },
-    { title: 'allaimovies',      desc: '3,090 films with an AI in them, coded and counted', href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies',               tag: 'dataset', external: true },
-    { title: 'ai characters',    desc: '3,263 AI characters from 1,884 films',           href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies-ai-characters', tag: 'dataset', external: true },
+const RELEASED = [
+    { title: 'Monsoon Protocol', desc: 'a song, on SoundCloud',                             href: 'https://soundcloud.com/prateek-gupta-505317056/2026-09-07t16_31_11-216z', gesture: 'conduct', external: true },
+    { title: 'allaimovies',      desc: '3,090 films with an AI in them, coded and counted', href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies', external: true },
+    { title: 'ai characters',    desc: '3,263 AI characters from 1,884 films',              href: 'https://huggingface.co/datasets/prateek-0-gupta/allaimovies-ai-characters', external: true },
 ];
 
-const SOCIALS = `
-    <a href="https://www.instagram.com/chai.and.photoshop" target="_blank" rel="noopener">Instagram</a>
-    <a href="https://www.linkedin.com/in/prateek-gupta08" target="_blank" rel="noopener">LinkedIn</a>
-    <a href="mailto:prateekgupta1198@gmail.com">E-mail</a>
-`;
+const ELSEWHERE = [
+    { title: 'Instagram',    href: 'https://www.instagram.com/chai.and.photoshop', external: true },
+    { title: 'LinkedIn',     href: 'https://www.linkedin.com/in/prateek-gupta08', external: true },
+    { title: 'GitHub',       href: 'https://github.com/prateek-0-gupta', external: true },
+    { title: 'Hugging Face', href: 'https://huggingface.co/prateek-0-gupta', external: true },
+    { title: 'E-mail',       href: 'mailto:prateekgupta1198@gmail.com' },
+];
 
-function indexRow(item, i) {
-    const num = String(i + 1).padStart(2, '0');
-    const linkAttrs = item.external
-        ? `href="${item.href}" target="_blank" rel="noopener"`
-        : `href="${item.href}" data-link`;
-    return `
-        <a class="ix-row" ${linkAttrs}>
-            <span class="ix-num">${num}</span>
-            <span class="ix-line">
-                <span class="ix-title">${item.title}</span>
-                <span class="ix-desc">${item.desc}</span>
-            </span>
-            <span class="ix-tag">${item.tag}${item.external ? ' ↗' : ''}</span>
-        </a>`;
+function item({ title, desc, href, gesture, external }) {
+    const attrs = external
+        ? `href="${href}"${href.startsWith('mailto:') ? '' : ' target="_blank" rel="noopener"'}`
+        : `href="${href}" data-link`;
+    const g = gesture ? ` data-gesture="${gesture}"` : '';
+    return `<li><a ${attrs}${g}>${title}</a>${desc ? `<span class="gp-desc">${desc}</span>` : ''}</li>`;
 }
 
+const list = (label, items) => `
+    <section class="gp-group">
+        <h2>${label}</h2>
+        <ul>${items.map(item).join('')}</ul>
+    </section>`;
+
 export default function Home() {
-    // returns its own cleanup, which bas runs when the page is left
-    useEffect(() => initJigsawTypography(), []);
+    useEffect(() => startFigure(), []);
 
-    const writings = ARTICLES.map(a => ({
-        title: a.title,
-        desc: a.blurb,
-        href: `/articles/${a.slug}`,
-        tag: 'writing',
-    }));
-
-    // numbered straight through, with a gap between the groups
-    let n = 0;
-    const groups = [PROJECTS, RELEASES, writings]
-        .map(group => group.map(item => indexRow(item, n++)).join(''))
-        .join('<div class="ix-gap"></div>');
+    const written = ARTICLES.map(a => ({ title: a.title, desc: a.blurb, href: `/articles/${a.slug}` }));
 
     return `
-    <div class="index-page">
+    <div class="gp">
+        <aside class="gp-margin" aria-hidden="true"></aside>
 
-        <header class="ix-top">
-            <span>prat.ee/k — Manchester, UK</span>
-        </header>
+        <main class="gp-text">
+            <h1>Prateek Gupta</h1>
+            <p class="gp-intro">
+                I'm a software engineer and future media practitioner in Manchester.
+                At Sum Vivas I work on AI  and <em>digital humans</em> systems. I also make
+                <em>small things</em> for the web, and write, mostly about AI and <em>film</em>.
+            </p>
 
-        <main class="ix-main">
-            <section class="ix-intro">
-                <span class="ix-hi">Hi, I am</span>
-                <div class="jigsaw-inline">
-                    <canvas id="typeCanvas"></canvas>
-                </div>
-                <p class="ix-role">
-                    software engineer &amp; creative future media practitioner <br><br>
-                    AI &amp; Development at Sum Vivas.
-                </p>
-                <div class="ix-social">${SOCIALS}</div>
-            </section>
+            ${list('made', MADE)}
+            ${list('released', RELEASED)}
+            ${list('written', written)}
+            ${list('elsewhere', ELSEWHERE)}
 
-            <section class="ix-list">
-                ${groups}
-            </section>
+            <footer class="gp-foot">© 2026 Prateek Kumar Gupta</footer>
         </main>
+    </div>`;
+}
 
-        <footer class="ix-foot">
-            <span>© 2026 Prateek Kumar Gupta</span>
-            <span class="ix-note">“The best way out is always through.” — Robert Frost</span>
-        </footer>
+// The creature is Mooli, shared by every page (components/mooli.js): it does
+// the general reading-along, the hello and keyboard focus. The home page adds
+// one thing of its own, the intro "said" on arrival. Returns the cleanup bas
+// runs on leaving; Mooli itself stays.
+function startFigure() {
+    const root = document.querySelector('.gp');
+    if (!root) return;
+    const pet = ensureMooli();
 
-    </div>
-    `;
+    const timers = new Set();
+    const later = (ms, fn) => { const id = setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); };
+
+    // after the hello, the intro "said" at about 180 words a minute, a beat on
+    // each emphasised word as it comes up, and the word answers, barely
+    const intro = root.querySelector('.gp-intro');
+    let words = 0;
+    for (const node of intro.childNodes) {
+        if (node.nodeName === 'EM') {
+            const em = node;
+            later(2400 + words * 330, () => {
+                pet.beat();
+                em.classList.add('is-beat');
+                later(320, () => em.classList.remove('is-beat'));
+            });
+        }
+        words += (node.textContent.match(/\S+/g) || []).length;
+    }
+
+    return () => timers.forEach(clearTimeout);
 }

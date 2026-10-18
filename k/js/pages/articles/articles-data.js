@@ -8,6 +8,12 @@
 
 export const ARTICLES = [
     {
+        slug: 'the-page-that-gestures-back',
+        title: 'The Page That Gestures Back',
+        blurb: 'the creature in the margin of my home page: co-speech gesture, a language of its own, and a bunny checked against rabbit research',
+        load: () => import('./margin-creature/margin-creature.js'),
+    },
+    {
         slug: 'reverse-engineering-esp32',
         title: 'Reverse-Engineering a No-Name ESP32 Board',
         blurb: 'a £20 "ai voice module" from amazon, no schematic, and an afternoon of finding out which pin does what',

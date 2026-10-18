@@ -28,10 +28,11 @@ const thinking = () => import('./pages/ithinkthereforiam/ithinkthereforeiam.js')
 
 export const routes = {
     '/': { load: () => import('./pages/home.js') },
-    '/snake': { load: () => import('./pages/projects/snake/snake.js'), head: { title: by('Nagmani') } },
-    '/p2pchat': { load: () => import('./pages/projects/p2pchat/p2pchat.js'), head: { title: by('p2p chat') } },
-    '/bvhviewer': { load: () => import('./pages/projects/bvhviewer/bvhviewer.js'), head: { title: by('BVH Viewer') } },
-    '/ithinkthereforiam': { load: thinking, head: { title: by('I Think Therefore I Am') } },
+    // tools and games: Mooli, the creature in the margin, stays off these (mooli: false)
+    '/snake': { load: () => import('./pages/projects/snake/snake.js'), head: { title: by('Nagmani') }, mooli: false },
+    '/p2pchat': { load: () => import('./pages/projects/p2pchat/p2pchat.js'), head: { title: by('p2p chat') }, mooli: false },
+    '/bvhviewer': { load: () => import('./pages/projects/bvhviewer/bvhviewer.js'), head: { title: by('BVH Viewer') }, mooli: false },
+    '/ithinkthereforiam': { load: thinking, head: { title: by('I Think Therefore I Am') }, mooli: false },
 
     // the writing is plain HTML strings, so the build script bakes it into the static shells
     '/articles': {
@@ -50,8 +51,8 @@ export const routes = {
     },
 
     // routed, but not pages of their own: no static shell, not in the sitemap
-    '/ithinkthereforeiam': { load: thinking, head: { title: by('I Think Therefore I Am') }, paths: () => [] },
-    '/test': { load: () => import('./pages/test.js'), head: { noindex: true }, paths: () => [] },
+    '/ithinkthereforeiam': { load: thinking, head: { title: by('I Think Therefore I Am') }, paths: () => [], mooli: false },
+    '/test': { load: () => import('./pages/test.js'), head: { noindex: true }, paths: () => [], mooli: false },
 
     '*': { page: NotFound, head: nothing },
 };
