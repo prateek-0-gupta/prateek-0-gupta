@@ -31,6 +31,7 @@ export const routes = {
     // tools and games: Mooli, the creature in the margin, stays off these (mooli: false)
     '/snake': { load: () => import('./pages/projects/snake/snake.js'), head: { title: by('Nagmani') }, mooli: false },
     '/p2pchat': { load: () => import('./pages/projects/p2pchat/p2pchat.js'), head: { title: by('p2p chat') }, mooli: false },
+    '/p2pdrop': { load: () => import('./pages/projects/p2pdrop/p2pdrop.js'), head: { title: by('p2p drop') }, mooli: false },
     '/bvhviewer': { load: () => import('./pages/projects/bvhviewer/bvhviewer.js'), head: { title: by('BVH Viewer') }, mooli: false },
     '/ithinkthereforiam': { load: thinking, head: { title: by('I Think Therefore I Am') }, mooli: false },
 

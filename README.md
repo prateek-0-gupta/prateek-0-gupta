@@ -10,6 +10,7 @@ Live at [prat.ee/k](https://prat.ee/k). No framework, no build step, no `node_mo
 
 - **Nagmani** (`/snake`): an Indian gothic snake game. The snake is cursed. So are you if you keep playing.
 - **p2p chat** (`/p2pchat`): a serverless chat over WebRTC. Your messages go from your browser to theirs and nowhere else. Like most conversations, they leave no trace.
+- **p2p drop** (`/p2pdrop`): send files browser to browser. Pick them, read out a six-character code, and whoever types it in gets them straight from your tab. Nothing is uploaded, which also means nothing arrives if you close the tab.
 - **BVH Viewer** (`/bvhviewer`): drop a `.bvh` motion-capture file in and watch a skeleton do whatever the actor did that day.
 - **I Think Therefore I Am** (`/ithinkthereforiam`): an infinite canvas for dumping thoughts. Sticky notes, a kanban board, red string between ideas like a detective who has lost the plot, a sketch layer with shapes and text you can move, resize and link. Everything stays in your browser. Nothing touches a server. Nothing lasts anyway, but this at least survives a refresh.
 - **Digital Human** and **Digital Doppelgänger** are external links, one to work at [Sum Vivas](https://avatar.sumvivas.com) and one to a short film.
@@ -239,6 +240,7 @@ Everything is public, so take what helps.
 - `k/js/pages/ithinkthereforiam/lib/`: a self-contained infinite canvas. Pan and zoom, sticky notes, undo stack, localStorage persistence, a sketch layer with hit-testing, selection handles and resize, and a threads module that draws string between any two things. Each file does one job.
 - `k/js/pages/projects/bvhviewer/`: a BVH motion-capture player in three.js, if you ever need to look at mocap without opening Blender.
 - `k/js/pages/projects/p2pchat/`: WebRTC chat that finds peers through public BitTorrent trackers via Trystero, so there is no server of mine anywhere in the loop. Discovery takes a minute. Patience is a feature.
+- `k/js/pages/projects/p2pdrop/`: the same trick for files. The sender streams each file in 256 KB slices over a Trystero action, the receiver can resume a half-finished file if the connection drops, and the share code is also the room password.
 
 There is no license file yet. Use the code freely, a credit is nice but I will not enforce it. The writing, photos and art are mine, ask before you reuse those.
 

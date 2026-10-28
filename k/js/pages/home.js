@@ -13,6 +13,7 @@ const MADE = [
     { title: 'Digital Human',          desc: 'a three.js, AI-driven digital human',      href: 'https://avatar.sumvivas.com',  gesture: 'wave', external: true },
     { title: 'Digital Doppelgänger',   desc: 'a short film',                             href: 'https://youtu.be/xPZ85jpZTsw', gesture: 'frame', external: true },
     { title: 'p2p chat',               desc: 'a chat with no server',                    href: '/p2pchat',                     gesture: 'exchange' },
+    { title: 'p2p drop',               desc: 'send files with a code, no server',        href: '/p2pdrop',                     gesture: 'exchange' },
     { title: 'BVH Viewer',             desc: 'for motion-capture files',                 href: '/bvhviewer',                   gesture: 'tpose' },
     { title: 'I Think Therefore I Am', desc: 'an infinite thought canvas',               href: '/ithinkthereforiam',           gesture: 'think' },
 ];
