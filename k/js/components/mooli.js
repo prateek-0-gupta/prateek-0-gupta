@@ -1,5 +1,5 @@
 // Mooli, the creature in the margin, on every page of the site except the
-// tools and games. This is the site-specific glue; the creature itself is in
+// tools and games (but p2p drop, where it carries the files across). This is the site-specific glue; the creature itself is in
 // margin-creature.js and knows nothing about this site.
 //
 // There is one Mooli per visit. It is created the first time a page wants it
@@ -31,7 +31,8 @@ function marginFor() {
         return Math.max(innerWidth <= 720 ? 14 : 24, m.left + m.width / 2);
     }
     // in order of preference: one querySelector over a list would return whichever comes first in the page
-    const text = ['.art-body', '.articles-index', '.art-nav', '#app > *'].map(q => document.querySelector(q)).find(Boolean);
+    // a page whose content sits in a column inside a full-width root marks the column with data-mooli-column
+    const text = ['[data-mooli-column]', '.art-body', '.articles-index', '.art-nav', '#app > *'].map(q => document.querySelector(q)).find(Boolean);
     const left = text ? text.getBoundingClientRect().left : 80;
     return left < 70 ? 14 : Math.max(24, left - 46);
 }

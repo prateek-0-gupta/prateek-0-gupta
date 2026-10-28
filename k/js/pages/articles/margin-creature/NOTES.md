@@ -551,3 +551,66 @@ Tested: home, first event at 13.6 s and 19.6 s in two runs; article, events at
 no events on articles at all: the article uses `<i>`/`<b>` rather than
 `<em>`/`<strong>`, so nothing qualified; the selector now includes `i, b,
 code, h4`, and carrots can also land on plain paragraph lines.
+
+
+## 16. Courier: Mooli carries the files on p2p drop
+
+On 28 October 2026 Mooli got its first job on a tool page. p2p drop
+(`/p2pdrop`) sends files browser to browser with a six-character code, and
+Mooli plays the courier between two little PCs drawn on the page: "you" on
+the left, "them" on the right. It is the one tool route without
+`mooli: false`.
+
+What it does, in the order a visitor meets it:
+- **Catch.** Drag files over the lobby and it runs into the drop zone, arms up
+  and wiggling, hopping on the spot ("gimme! gimme!" / "ooh! filo! filo!").
+- **Pack.** Drop them and it hugs a cardboard parcel to its chest, arms
+  wrapping round and round ("packa-packa!" / "tapo, tapo!"), then hops it up
+  onto its head. The parcel is taped and has a radish stamp on it.
+- **Wait.** The sender's Mooli stands by its own PC with the parcel up,
+  tapping a foot, and every few seconds goes up on tiptoe to look at the
+  empty PC ("where-a?" / "hullo-o? anybodi?").
+- **Deliver.** Once bytes move, it shuttles: a parcel pops out of the source
+  screen in an arc onto its head, it carries it over (leaning in, a little
+  effort in the face) and tosses it into the far screen, which flashes. Then
+  it runs back empty-handed, arms swinging. It runs faster the faster the
+  transfer is (300 px/s idle pace up to 860 px/s at 4 MB/s and over), and at a
+  sprint kicks up dust. The far screen fills with green as the data lands.
+- **Stuck.** If nothing has landed for 2.5 s it stops where it is, hugs the
+  parcel, droops and looks at the other end ("uh-oh... gone-a?").
+- **Done.** Each finished file gets confetti, a flip and "ta-da! deliver-o!" /
+  "signa here!". Then it puts any parcel back and goes back to its own life.
+- **Grabbed.** Pick it up mid-delivery and the parcel tumbles off its head
+  and fades; it goes back for another.
+
+Split: the creature knows nothing about files. It has a generic
+`pet.courier(job)`, where `job` is `{ from, to, mine, state, pace, onDrop }`:
+two rect functions, which end is the visitor's, a state function ('wait',
+'go', 'stuck', 'idle'), a 0–1 pace and a callback as each parcel goes in.
+Plus `pet.expect(rect)`, `pet.pack()` and `pet.delivered()`. The page answers
+the state questions from its own transfer bookkeeping, so it never has to
+push updates. The courier modes sit above attending, petting and feeding in
+the priority order, and `pet.busy` is true throughout, so carrots and tidying
+leave it alone at work.
+
+**Bugs worth telling.**
+- *The pancake.* At courier sprint speed the walk cycle hopped about 7 times a
+  second, each landing adding a squash impulse faster than the body spring
+  (about 1.4 Hz) could recover, so it ran pinned flat at the squash clamp with
+  its arms out. Zoomies had the same latent problem. Fix: the step rate stops
+  rising past 520 px/s and each landing's squash scales down with speed.
+- *Hired, then forgotten.* Opening a share link starts the receive inside the
+  page's first effect, before the site's after-render hook calls
+  `pet.newPage()`, which clears whatever belonged to "the old page" and with
+  it the brand-new job. The page now keeps the job and gives it back after
+  any render where the creature has lost it.
+- *Honest animation.* A closed tab does not always say goodbye over WebRTC,
+  and the browser can take about 30 s to notice, so Mooli kept cheerfully
+  delivering parcels while nothing moved. The state now comes from whether
+  bytes are actually landing, not whether the connection claims to be up.
+
+Tested with headless Edge via playwright-core, two browser contexts over the
+real public trackers (`mooli-drop.mjs` in the session scratchpad, modelled on
+`tests/speak2.mjs`): screenshots of catch, pack, wait, both ends mid-delivery,
+delivered, and the sender's tab closed mid-transfer; speech logged through the
+`fillText` hook.

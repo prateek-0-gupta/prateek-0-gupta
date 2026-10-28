@@ -10,7 +10,7 @@ Live at [prat.ee/k](https://prat.ee/k). No framework, no build step, no `node_mo
 
 - **Nagmani** (`/snake`): an Indian gothic snake game. The snake is cursed. So are you if you keep playing.
 - **p2p chat** (`/p2pchat`): a serverless chat over WebRTC. Your messages go from your browser to theirs and nowhere else. Like most conversations, they leave no trace.
-- **p2p drop** (`/p2pdrop`): send files browser to browser. Pick them, read out a six-character code, and whoever types it in gets them straight from your tab. Nothing is uploaded, which also means nothing arrives if you close the tab.
+- **p2p drop** (`/p2pdrop`): send files browser to browser. Pick them, read out a six-character code, and whoever types it in gets them straight from your tab. Nothing is uploaded, which also means nothing arrives if you close the tab. Mooli, who stays off the other tools, works here as the courier: it runs parcels from your PC to theirs while the bytes flow, faster when they flow faster, and hugs one sadly if the transfer stalls.
 - **BVH Viewer** (`/bvhviewer`): drop a `.bvh` motion-capture file in and watch a skeleton do whatever the actor did that day.
 - **I Think Therefore I Am** (`/ithinkthereforiam`): an infinite canvas for dumping thoughts. Sticky notes, a kanban board, red string between ideas like a detective who has lost the plot, a sketch layer with shapes and text you can move, resize and link. Everything stays in your browser. Nothing touches a server. Nothing lasts anyway, but this at least survives a refresh.
 - **Digital Human** and **Digital Doppelgänger** are external links, one to work at [Sum Vivas](https://avatar.sumvivas.com) and one to a short film.

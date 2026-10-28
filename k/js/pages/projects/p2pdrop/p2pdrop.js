@@ -7,6 +7,7 @@
 // password, so the signalling is encrypted with it too.
 
 import { useState, useEffect, registerHandler } from '../../../framework.js';
+import { ensureMooli } from '../../../components/mooli.js';
 
 const APP_ID = 'prateek-p2p-drop-v1';
 const CHUNK = 256 * 1024;
@@ -99,6 +100,84 @@ function say(text, ms = 0) {
     rerender();
 }
 
+// ── Mooli, the courier ──────────────────────────────────────────────
+// The creature runs a parcel from one PC on the page to the other for as long
+// as bytes are moving. It reads everything it needs through the job's
+// functions, so nothing here has to tell it when things change; the page only
+// tells it about moments: files arriving to pack, a file delivered.
+
+const FAST = 4 * 1024 * 1024;   // bytes a second at which it is flat out
+const mooli = () => ensureMooli();
+let _job = null;
+
+function hire() {
+    _job = courierJob();
+    mooli().courier(_job);
+}
+
+// a new page makes it forget what it was doing, and on a shared link the
+// receive starts before the site has told it the page is new; so after every
+// render, give it the job back if it lost it
+function rehire() {
+    if (_job && mooli().courierJob !== _job) mooli().courier(_job);
+}
+const pcRect = id => () => document.getElementById(id)?.getBoundingClientRect() ?? null;
+
+function courierJob() {
+    const sending = mode === 'send';
+    return {
+        from: pcRect(sending ? 'drop-pc-you' : 'drop-pc-them'),
+        to: pcRect(sending ? 'drop-pc-them' : 'drop-pc-you'),
+        mine: sending ? 'from' : 'to',
+        state: courierState,
+        pace: courierPace,
+        onDrop: () => blink(sending ? 'drop-pc-them' : 'drop-pc-you'),
+    };
+}
+
+// A closed tab does not always say goodbye, and WebRTC can take half a minute
+// to notice, so it goes by whether bytes are actually landing: a transfer with
+// nothing for a few seconds is stuck, whatever the connection claims.
+const STALL = 2500;
+const flowing = at => performance.now() - at < STALL;
+
+function courierState() {
+    if (mode === 'send') {
+        const rs = Object.values(receivers);
+        const moving = rs.filter(r => r.current);
+        if (moving.length) return moving.some(r => flowing(r.current.lastAt)) ? 'go' : 'stuck';
+        if (rs.length && rs.every(r => r.done.size >= outgoing.length)) return 'idle';
+        return 'wait';
+    }
+    const incs = Object.values(incoming);
+    if (incs.some(i => i.state === 'paused')) return 'stuck';
+    const getting = incs.filter(i => i.state === 'getting');
+    if (getting.length) return senderId && getting.some(i => flowing(i.lastAt)) ? 'go' : 'stuck';
+    if (!senderId) return manifest.length ? 'idle' : 'wait';
+    return 'idle';
+}
+
+function courierPace() {
+    const now = performance.now();
+    const rate = (bytes, at) => bytes / Math.max(0.5, (now - at) / 1000);
+    let total = 0;
+    if (mode === 'send') {
+        for (const r of Object.values(receivers)) if (r.current) total += rate(r.current.sent - r.current.startBytes, r.current.startedAt);
+    } else {
+        for (const i of Object.values(incoming)) if (i.state === 'getting') total += rate(i.got - i.startBytes, i.startedAt);
+    }
+    return Math.min(1, total / FAST);
+}
+
+// the screen it tossed a parcel into lights up
+function blink(id) {
+    document.querySelector(`#${id} .drop-pc-screen`)?.animate(
+        [{ filter: 'brightness(2.4)', transform: 'scale(1.08)' }, { filter: 'brightness(1)', transform: 'scale(1)' }],
+        { duration: 380, easing: 'ease-out' });
+}
+
+const dropZoneRect = () => document.querySelector('.drop-zone')?.getBoundingClientRect() ?? null;
+
 // ── room ────────────────────────────────────────────────────────────
 
 async function join(c) {
@@ -124,6 +203,7 @@ async function join(c) {
             room.onPeerJoin(peerId => {
                 receivers[peerId] = { queue: Promise.resolve(), gens: {}, current: null, done: new Set() };
                 sendManifest(manifestOf(), peerId);
+                mooli().say('hello');
                 if (_joinTimer) { clearTimeout(_joinTimer); _joinTimer = null; }
                 setStatus('connected');
             });
@@ -135,10 +215,12 @@ async function join(c) {
             onWant(({ id, from }, peerId) => serve(peerId, id, from || 0));
             onDone(({ id }, peerId) => {
                 receivers[peerId]?.done.add(id);
+                mooli().delivered();
                 rerender();
             });
         } else {
             onManifest((list, peerId) => {
+                if (!manifest.length) mooli().say('hello');
                 senderId = peerId;
                 if (_joinTimer) { clearTimeout(_joinTimer); _joinTimer = null; }
                 manifest = list;
@@ -157,6 +239,7 @@ async function join(c) {
                 if (!inc || inc.state !== 'getting' || meta.i !== inc.parts.length) return;
                 inc.parts.push(data);
                 inc.got += data.byteLength;
+                inc.lastAt = performance.now();
                 if (inc.parts.length === inc.total) finish(inc);
                 queueRender();
             });
@@ -188,6 +271,9 @@ function leave() {
     [_joinTimer, _noticeTimer, _dragTimer].forEach(t => t && clearTimeout(t));
     _joinTimer = _noticeTimer = _dragTimer = null;
     if (room) room.leave();
+    _job = null;
+    mooli().courier(null);
+    mooli().expect(null);
     Object.values(incoming).forEach(inc => inc.url && URL.revokeObjectURL(inc.url));
     room = null;
     actions = null;
@@ -211,9 +297,12 @@ function addFiles(fileList) {
     const files = Array.from(fileList || []);
     if (!files.length) return;
     files.forEach(file => outgoing.push({ id: genId(), file }));
+    mooli().expect(null);
+    mooli().pack();
     if (mode === 'idle') {
         mode = 'send';
         code = newCode();
+        hire();
         join(code);
     } else if (actions) {
         actions.sendManifest(manifestOf()); // everyone already here sees the new files
@@ -235,12 +324,13 @@ function serve(peerId, id, from) {
 async function pump(peerId, r, { id, file }, from, gen) {
     const total = Math.ceil(file.size / CHUNK);
     const start = Math.min(file.size, from * CHUNK);
-    r.current = { name: file.name, size: file.size, sent: start, startBytes: start, startedAt: performance.now() };
+    r.current = { name: file.name, size: file.size, sent: start, startBytes: start, startedAt: performance.now(), lastAt: performance.now() };
     for (let i = from; i < total; i++) {
         if (receivers[peerId] !== r || r.gens[id] !== gen || !actions) break;
         const buf = await file.slice(i * CHUNK, (i + 1) * CHUNK).arrayBuffer();
         await actions.sendChunk(buf, peerId, { id, i });
         r.current.sent = Math.min(file.size, (i + 1) * CHUNK);
+        r.current.lastAt = performance.now();
         queueRender();
     }
     r.current = null;
@@ -257,6 +347,7 @@ function request(id) {
     inc.state = 'getting';
     inc.startedAt = performance.now();
     inc.startBytes = inc.got;
+    inc.lastAt = performance.now();
     actions.sendWant({ id, from: inc.parts.length }, senderId);
     rerender();
 }
@@ -267,6 +358,7 @@ function finish(inc) {
     inc.url = URL.createObjectURL(blob);
     inc.state = 'done';
     if (senderId && actions) actions.sendDone({ id: inc.id }, senderId);
+    mooli().delivered();
     save(inc);
     rerender();
 }
@@ -288,6 +380,7 @@ function startReceive(raw) {
     }
     mode = 'receive';
     code = c;
+    hire();
     rerender();
     join(c);
 }
@@ -307,6 +400,9 @@ export default function P2PDrop() {
     const [_tick, setTick] = useState(0);
     _rerender = setTick;
 
+    // after the site's own after-render step, which can clear it (see rehire)
+    useEffect(() => { const t = setTimeout(rehire); return () => clearTimeout(t); });
+
     useEffect(() => {
         const onChange = e => {
             if (e.target.id !== 'drop-file') return;
@@ -319,20 +415,23 @@ export default function P2PDrop() {
         const onDragOver = e => {
             if (mode === 'receive' || !e.dataTransfer?.types.includes('Files')) return;
             e.preventDefault();
-            if (!dragging) { dragging = true; rerender(); }
+            if (!dragging) { dragging = true; mooli().expect(dropZoneRect); rerender(); }
             // there is no reliable dragleave for the window; stop highlighting when the overs stop
             if (_dragTimer) clearTimeout(_dragTimer);
-            _dragTimer = setTimeout(() => { dragging = false; rerender(); }, 150);
+            _dragTimer = setTimeout(() => { dragging = false; mooli().expect(null); rerender(); }, 150);
         };
         const onDrop = e => {
             if (mode === 'receive' || !e.dataTransfer?.files.length) return;
             e.preventDefault();
             dragging = false;
+            if (_dragTimer) { clearTimeout(_dragTimer); _dragTimer = null; }
             addFiles(e.dataTransfer.files);
         };
         const onUnload = e => {
             if (mode === 'send') { e.preventDefault(); e.returnValue = ''; }
         };
+        // nothing re-renders when bytes stop arriving, so look again now and then
+        const heartbeat = setInterval(() => { if (mode !== 'idle') rerender(); }, 1000);
         document.addEventListener('change', onChange);
         document.addEventListener('keydown', onKey);
         document.addEventListener('dragover', onDragOver);
@@ -344,6 +443,7 @@ export default function P2PDrop() {
         if (mode === 'idle' && fromLink.length === CODE_LEN) startReceive(fromLink);
 
         return () => {
+            clearInterval(heartbeat);
             document.removeEventListener('change', onChange);
             document.removeEventListener('keydown', onKey);
             document.removeEventListener('dragover', onDragOver);
@@ -375,7 +475,7 @@ export default function P2PDrop() {
     if (mode === 'idle') {
         return `
         <div class="p2p-root">
-        <div class="p2p-lobby">
+        <div class="p2p-lobby" data-mooli-column>
             <a href="/" data-link class="p2p-back">&larr; Back</a>
 
             <div class="p2p-logo">&#8645;</div>
@@ -383,7 +483,7 @@ export default function P2PDrop() {
             <p class="p2p-subtitle">Send files instantly, share with a code.<br>Browser to browser, no server in between.</p>
 
             <div class="p2p-form">
-                <label for="drop-file" class="drop-zone${dragging ? ' drop-zone-hot' : ''}">
+                <label for="drop-file" class="drop-zone${dragging ? ' drop-zone-hot' : ''}" data-gesture="exchange">
                     <span class="drop-zone-big">${dragging ? 'Let go to send' : 'Drop files here'}</span>
                     <span class="drop-zone-small">or click to choose</span>
                 </label>
@@ -393,7 +493,7 @@ export default function P2PDrop() {
 
                 <label class="p2p-label" for="drop-code">Code</label>
                 <input id="drop-code" class="p2p-input drop-code-input" type="text" placeholder="K7Q-M2X" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-                <button data-action="drop-receive" class="p2p-btn p2p-btn-secondary">Receive</button>
+                <button data-action="drop-receive" class="p2p-btn p2p-btn-secondary" data-gesture="point">Receive</button>
                 ${noticeHtml}
             </div>
 
@@ -428,6 +528,23 @@ export default function P2PDrop() {
 
     const bar = (done, total) => `<div class="drop-bar"><i style="width:${total ? Math.min(100, done / total * 100).toFixed(1) : 100}%"></i></div>`;
 
+    // two little PCs for Mooli to run between: you on the left, them on the
+    // right; the one being sent to fills up as the bytes land
+    const pc = (id, name, { on = true, fill = 0 } = {}) => `
+        <div class="drop-pc${on ? '' : ' drop-pc-off'}">
+            <div class="drop-pc-box" id="${id}">
+                <div class="drop-pc-screen"><i style="height:${(Math.min(1, fill) * 100).toFixed(1)}%"></i></div>
+                <div class="drop-pc-neck"></div><div class="drop-pc-base"></div>
+            </div>
+            <span class="drop-pc-name">${name}</span>
+        </div>`;
+    const wire = ({ them, themOn, youFill, themFill, flow }) => `
+        <div class="drop-wire${flow ? ` drop-wire-live drop-wire-${flow}` : ''}">
+            ${pc('drop-pc-you', 'you', { fill: youFill })}
+            <div class="drop-wire-line"></div>
+            ${pc('drop-pc-them', escapeHtml(them), { on: themOn, fill: themFill })}
+        </div>`;
+
     if (mode === 'send') {
         const peerIds = Object.keys(receivers);
         const totalSize = outgoing.reduce((a, o) => a + o.file.size, 0);
@@ -451,11 +568,21 @@ export default function P2PDrop() {
             </li>`;
         }).join('') : '<li class="p2p-no-peers">Nobody yet</li>';
 
+        // how much of everything the receivers have between them, for the far screen
+        const sizeOf = id => outgoing.find(o => o.id === id)?.file.size || 0;
+        const landed = peerIds.reduce((a, id) => {
+            const r = receivers[id];
+            return a + [...r.done].reduce((b, f) => b + sizeOf(f), 0) + (r.current ? r.current.sent : 0);
+        }, 0);
+        const themFill = peerIds.length && totalSize ? landed / (totalSize * peerIds.length) : 0;
+        const them = peerIds.length > 1 ? `${peerIds.length} of them` : 'them';
+
         return `
-        <div class="p2p-root">
-        <div class="p2p-chat-container">
+        <div class="p2p-root" data-no-tidy>
+        <div class="p2p-chat-container" data-mooli-column>
             ${header('Sending', `${outgoing.length} file${outgoing.length !== 1 ? 's' : ''} · ${formatBytes(totalSize)}`)}
             <div class="drop-body">
+                ${wire({ them, themOn: peerIds.length > 0, youFill: 1, themFill, flow: courierState() === 'go' ? 'right' : '' })}
                 <div class="drop-code-card">
                     <span class="p2p-label">Your code</span>
                     <div class="drop-code-big">${pretty(code)}</div>
@@ -488,7 +615,7 @@ export default function P2PDrop() {
         const pct = inc.size ? Math.floor(inc.got / inc.size * 100) : 100;
         const right =
             inc.state === 'done'    ? `<button data-action="drop-save" class="drop-mini drop-mini-ok">Save</button>` :
-            inc.state === 'getting' ? `<span class="drop-file-size">${pct}% ${speed(inc.got - inc.startBytes, inc.startedAt)}</span>` :
+            inc.state === 'getting' ? `<span class="drop-file-size">${flowing(inc.lastAt) ? `${pct}% ${speed(inc.got - inc.startBytes, inc.startedAt)}` : `stalled at ${pct}%`}</span>` :
             inc.state === 'paused'  ? `<span class="drop-file-size">paused at ${pct}%</span>` :
                                       `<button data-action="drop-get" class="drop-mini">Get</button>`;
         return `
@@ -503,12 +630,14 @@ export default function P2PDrop() {
     }).join('') : '<li class="p2p-no-peers">The file list appears once the sender is found.</li>';
 
     const totalSize = manifest.reduce((a, f) => a + f.size, 0);
+    const got = manifest.reduce((a, f) => a + (incoming[f.id].state === 'done' ? f.size : incoming[f.id].got), 0);
 
     return `
-    <div class="p2p-root">
-    <div class="p2p-chat-container">
+    <div class="p2p-root" data-no-tidy>
+    <div class="p2p-chat-container" data-mooli-column>
         ${header('Receiving', manifest.length ? `${manifest.length} file${manifest.length !== 1 ? 's' : ''} · ${formatBytes(totalSize)}` : 'waiting for the list')}
         <div class="drop-body">
+            ${wire({ them: 'sender', themOn: !!senderId, youFill: totalSize ? got / totalSize : 0, themFill: senderId ? 1 : 0, flow: courierState() === 'go' ? 'left' : '' })}
             ${noticeHtml}
             <ul class="drop-list">${filesHtml}</ul>
             ${pending ? `<button data-action="drop-get-all" class="p2p-btn p2p-btn-primary">Receive ${pending > 1 ? `all ${pending}` : 'it'}</button>` : ''}

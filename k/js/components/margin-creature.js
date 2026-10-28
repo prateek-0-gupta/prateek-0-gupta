@@ -33,6 +33,9 @@
 //   pet.fix(el, done)          go and put something straight; done() is when it springs back
 //   pet.germ(x, y, fromX, fromY)  a carrot virus pops out and heads for (x, y); it gets chased off
 //   pet.say(key | text)        say one of its words (hello, cheer, look...) or anything
+//   pet.courier(job | null)    carry parcels from one element to another (see api.courier)
+//   pet.expect(rect | null)    something is about to be dropped there: arms up, ready to catch
+//   pet.pack()  pet.delivered()   wrap a parcel up; a delivery landed, hooray
 //   pet.sleep()  pet.wake()  pet.destroy()
 // Pointer things (looking at you, following, fleeing, petting, dragging,
 // throwing, mischief) it handles itself, because it needs to hit-test its own
@@ -185,6 +188,13 @@ export function createCreature({
     won:      ['ha! begone!', 'no carroto here.', 'bapa. all clean.'],
     chin:     ['mine-a.', 'mark-a. mine.', 'dis mine now.'],
     eep:      ['eep!', 'EEP. no up!'],
+    gimme:    ['gimme! gimme!', 'ooh! filo! filo!', 'catcha!'],
+    pack:     ['packa-packa!', 'wrap-wrap!', 'tapo, tapo!'],
+    waitfor:  ['where-a?', 'hullo-o? anybodi?', 'tap... tap... tap.'],
+    post:     ['deliveri!', 'hup! hup! posto!', 'coming-a!'],
+    dropin:   ['plop!', 'in-a go!', 'tikka!'],
+    delivered:['ta-da! deliver-o!', 'all dere! bapa!', 'signa here!'],
+    lost:     ['uh-oh... gone-a?', 'hullo-o? come back-a...'],
   };
   const THOUGHTS = new Set(['think', 'sleep', 'read', 'inspect', 'yawn', 'babble']);
   const SYL = ['ba', 'po', 'mi', 'lo', 'ki', 'ta', 'nu', 'bee', 'la', 'pi', 'do', 'ka', 'mu', 'tee', 'bo', 'ya'];
@@ -210,6 +220,7 @@ export function createCreature({
     dizzy: ['dizzy', 1, true], giggle: ['giggle', 1, true], flee: ['flee', 1, true],
     carry: ['carry', 1, true], thrown: ['thrown', 1, true], fetch: ['fetch', 0.9],
     sleep: ['sleep', 1], inspect: ['inspect', 0.8], pet: ['pet', 0.6], block: ['block', 1, true],
+    catch: ['gimme', 1, true], pack: ['pack', 0.9, true], 'courier-wait': ['waitfor', 0.5], 'courier-stuck': ['lost', 1, true],
   };
 
   // ── personality: an animal's habits on top of its own ──
@@ -238,6 +249,13 @@ export function createCreature({
   // carrot viruses: they pop out of the page, chew on a word, and get chased off
   // in a cartoon fight cloud. x is a client x, y a page y (they scroll with the page).
   let germs = [], fight = null;                            // germ: { x, y, tx, ty, born, state, ... }
+  // courier work: a parcel pops out of one thing on the page onto its head, and
+  // it runs it over to another and tosses it in (api.courier)
+  let courier = null;                                      // { job, leg: 'fetch' | 'carry', st, since, busyUntil, pending, ending, done }
+  let catching = null;                                     // () => rect: something is about to be dropped there
+  let packing = null;                                      // { since, lifted }
+  let parcel = false, parcelAt = 'head';                   // whether it holds one, and where: on its head or hugged
+  let parcels = [];                                        // in flight { x0, y0, x1, y1, since, dur, s0, s1, then } or falling { fall, x, y, vx, vy, rot, spin }
   const chinned = new WeakSet();                           // links a bunny has already marked as its own
   let nextPounceAt = nowS() + 8, nextTiltAt = nowS() + 4, nextSlowBlinkAt = nowS() + 6;
   function startAct(name, dur, data = {}) { act = { name, since: nowS(), until: nowS() + dur, ...data }; }
@@ -479,7 +497,8 @@ export function createCreature({
     // the pointer just left the window: keep an eye on where it went
     if (!dp && exit && now - exit.t < 4) look = { x: exit.x - p.x, y: exit.y - p.y };
     let mode = 'home';
-    let foe = null;
+    let foe = null, cr = null, cw = null;
+    parcelAt = 'head';
 
     if (tending && !tending.fixed && (now - tending.since > 10 || !tending.el.isConnected)) { tending.fixed = true; tending.done(); tending = null; }
 
@@ -573,6 +592,34 @@ export function createCreature({
         if (pat > 0.95 && !eating.patting) { eating.patting = true; for (let i = 8; i < 13; i++) wobV[i] += 1.2; }
         if (pat < 0) eating.patting = false;
       } else { eating = null; afterMeal(); }
+    } else if (packing) {
+      // wrapping it up, round and round, then up onto its head
+      mode = 'pack';
+      const e = now - packing.since;
+      tg.k = 60;
+      if (e < 0.95) {
+        parcelAt = 'chest';
+        const w = Math.sin(e * 16);
+        tg.arms = [[2.16 + 0.18 * w, 0.62], [PI - 2.16 + 0.18 * w, 0.62]];
+        tg.sy = 0.92 + 0.03 * w; tg.lid = 0.7; tg.happy = 0.6; tg.mouth = 0.1;
+        look = { x: 0, y: 0.7, abs: true };
+      } else {
+        if (!packing.lifted) { packing.lifted = true; jump(140); jelly(2); }
+        tg.arms = [[-1.3, 1.05], [PI + 1.3, 1.05]]; tg.happy = 1;
+        look = { x: 0, y: -0.6, abs: true };
+        if (e > 1.35) packing = null;
+      }
+    } else if (catching && (cr = catching())) {
+      // something is coming: under it, arms up, bouncing on the spot
+      mode = 'catch';
+      tg.x = clamp(cr.left + cr.width / 2, R + 6, innerWidth - R - 6); tg.y = clamp(cr.bottom - R * 1.3, R + 6, innerHeight - R - 6);
+      tg.k = 90; tg.vmax = 700; tg.happy = 1; tg.mouth = 0.35; tg.sy = 1.06;
+      const w = Math.sin(now * 9);
+      tg.arms = [[-1.0 + 0.25 * w, 1.05], [PI + 1.0 - 0.25 * w, 1.05]];
+      if (Math.floor(now * 2.2) !== Math.floor((now - dt) * 2.2)) jump(70);
+      look = { x: 0, y: -1, abs: true };
+    } else if (courier && (cw = runCourier(tg, now, dt))) {
+      mode = cw.mode; look = cw.look;
     } else if (fight || (foe = germs.find(g => (g.state === 'walk' || g.state === 'nibble') && now - g.born > 0.6))) {
       mode = 'fight';
       if (fight) {
@@ -897,6 +944,122 @@ export function createCreature({
     block = null;
   }
 
+  // ── courier ──
+  const centre = r => ({ x: r.left + r.width / 2, y: r.top + r.height * 0.4 });
+  const headSpot = () => ({ x: p.x, y: p.y - hop - R * 1.5 * S.sc.v });
+  function toss(a, b, o = {}) { parcels.push({ x0: a.x, y0: a.y, x1: b.x, y1: b.y, since: nowS(), dur: 0.32, s0: 1, s1: 1, ...o }); }
+  // out of the thing's middle, in an arc, onto its head
+  function pickUp(r) {
+    courier.pending = true;
+    toss(centre(r), headSpot(), { s0: 0.3, then: () => { parcel = true; if (courier) courier.pending = false; squash(0.3); jelly(2); } });
+  }
+  // off its head, in an arc, into the thing, shrinking as it goes in
+  function handOver(r, then) {
+    parcel = false;
+    toss(headSpot(), centre(r), { s1: 0.3, then });
+    S.sy.vel += 2; jelly(1.5);
+  }
+  // knocked out of its hands: it tumbles off and fades
+  function dropParcel() {
+    if (!parcel) return;
+    parcel = false;
+    const h = headSpot();
+    parcels.push({ fall: true, x: h.x, y: h.y, vx: rnd(-90, 90), vy: -rnd(120, 200), since: nowS(), rot: 0, spin: rnd(-7, 7) });
+    if (courier) { courier.leg = 'fetch'; courier.busyUntil = 0; }
+  }
+  function poof() {
+    if (!parcel) return;
+    parcel = false;
+    const h = headSpot();
+    for (let i = 0; i < 10; i++) bits.push({ x: h.x + rnd(-R * 0.6, R * 0.6), y: h.y + rnd(-R * 0.4, R * 0.4), vx: rnd(-120, 120), vy: rnd(-200, -60), t: nowS(), col: i % 2 ? '#C98F55' : '#E8CF9F', r: rnd(1, 2.2) });
+  }
+  // a puff kicked up behind its feet when it sprints
+  const dust = () => bits.push({ x: p.x - Math.sign(v.x) * R * 0.6, y: p.y + R * 0.9, vx: -v.x * 0.15 + rnd(-20, 20), vy: -rnd(60, 120), t: nowS(), col: ink, r: rnd(0.8, 1.6) });
+
+  // One frame of courier work. The job says where from and where to, which end
+  // is the visitor's own, and what is going on: 'wait' (nobody at the other
+  // end yet), 'go' (shuttling), 'stuck' (the other end went quiet mid-way) or
+  // 'idle' (nothing to carry: it lives as usual). Sets the pose on tg and
+  // returns { mode, look }, or null to leave it to everything else.
+  function runCourier(tg, now, dt) {
+    const c = courier, j = c.job;
+    const a = j.from(), b = j.to();
+    if (c.done || !a || !b || !a.width || !b.width) {
+      if (c.done || c.ending) { poof(); courier = null; }
+      return null;
+    }
+    let st = j.state ? j.state() : 'go';
+    if (c.ending || (st === 'idle' && c.leg === 'carry' && parcel)) st = 'go';   // finish the delivery in hand
+    if (st !== c.st) { c.st = st; c.since = now; }
+    const e = now - c.since;
+    const dir = Math.sign(centre(b).x - centre(a).x) || 1;
+    // it stands on the line the two things sit on, just beside each one, on the side facing the other
+    const beside = (r, d) => ({ x: clamp(d > 0 ? r.right + R * 1.35 : r.left - R * 1.35, R + 4, innerWidth - R - 4), y: clamp(r.bottom - R * 0.95, R + 4, innerHeight - R - 4) });
+    const atFrom = beside(a, dir), atTo = beside(b, -dir);
+    const mineTo = j.mine === 'to', mine = mineTo ? b : a, other = mineTo ? a : b, home = mineTo ? atTo : atFrom;
+    const lookAt = r => { const q = centre(r); return { x: q.x - p.x, y: q.y - p.y }; };
+    const HOLD = [[-1.3, 1.05], [PI + 1.3, 1.05]];
+
+    if (st === 'idle') {
+      if (parcel && !c.pending) { parcel = false; toss(headSpot(), centre(mine), { s1: 0.3 }); }   // put it back
+      c.leg = 'fetch';
+      return null;
+    }
+
+    if (st === 'wait') {
+      // by its own one, the parcel ready if it is the sender, tapping a foot,
+      // and every few seconds up on tiptoe to look for the other end
+      if (!mineTo && !parcel && !c.pending && Math.hypot(home.x - p.x, home.y - p.y) < R * 2) pickUp(a);
+      tg.x = home.x; tg.y = home.y; tg.k = 50; tg.vmax = 420;
+      const tap = Math.max(0, Math.sin(e * 7)), tall = Math.max(0, Math.sin(e * 1.2 - 1)) ** 6;
+      tg.sy = 1 + 0.16 * tall - 0.03 * tap; tg.sx = 1 - 0.08 * tall;
+      tg.y -= R * 0.15 * tall; tg.tilt = 0.05 * Math.sin(e * 3.5);
+      tg.arms = parcel || c.pending ? HOLD : [[1.95, 0.45], [PI - 1.95, 0.45]];
+      if (e > 6 && now > (c.mutterAt || 0)) { say('waitfor', { chance: 0.6 }); c.mutterAt = now + rnd(8, 13); }
+      return { mode: 'courier-wait', look: lookAt(other) };
+    }
+
+    if (st === 'stuck') {
+      // the other end went quiet: it stops where it is, hugs what it has and looks over
+      if (parcel) parcelAt = 'chest';
+      tg.k = 30; tg.sy = 0.9; tg.sx = 1.06; tg.lid = 0.62; tg.scared = 0.3;
+      tg.arms = parcel ? [[2.16, 0.62], [PI - 2.16, 0.62]] : [[1.3, 0.3], [PI - 1.3, 0.3]];
+      tg.tilt = 0.05 * Math.sin(e * 1.4);
+      return { mode: 'courier-stuck', look: lookAt(other) };
+    }
+
+    // go: back and forth, faster the faster things are moving
+    const pace = clamp(j.pace ? j.pace() : 0.4, 0, 1), speed = 300 + 560 * pace;
+    if (now < c.busyUntil || c.pending) {
+      tg.k = 120; tg.arms = HOLD;
+      return { mode: 'courier-hand', look: { x: 0, y: -0.8, abs: true } };
+    }
+    const sprint = pace > 0.5 && Math.abs(v.x) > 200 && Math.random() < dt * 25;
+    if (c.leg === 'fetch') {
+      tg.x = atFrom.x; tg.y = atFrom.y; tg.k = 60; tg.vmax = speed;
+      const sw = 0.45 * Math.sin(now * 13);
+      tg.arms = [[0.85 + sw, 0.75], [PI - 0.85 + sw, 0.75]]; tg.happy = 0.7;
+      if (sprint) dust();
+      if (Math.hypot(atFrom.x - p.x, atFrom.y - p.y) < R * 0.6) {
+        c.leg = 'carry';
+        if (!parcel) { pickUp(a); c.busyUntil = now + 0.36; if (!c.trips) say('post', { chance: 0.8 }); }
+      }
+      return { mode: 'courier-go', look: lookAt(a) };
+    }
+    tg.x = atTo.x; tg.y = atTo.y; tg.k = 60; tg.vmax = speed * 0.85;
+    tg.arms = HOLD; tg.happy = 0.45; tg.lid = 0.9; tg.mouth = 0.12; tg.tilt = 0.08 * dir;
+    if (sprint) dust();
+    if (Math.hypot(atTo.x - p.x, atTo.y - p.y) < R * 0.6) {
+      if (parcel) {
+        handOver(b, () => { c.trips++; j.onDrop?.(); if (c.ending) c.done = true; });
+        c.busyUntil = now + 0.3;
+        say('dropin', { chance: 0.25 });
+      }
+      c.leg = 'fetch';
+    }
+    return { mode: 'courier-go', look: lookAt(b) };
+  }
+
   // ───────────────────────────── moving ─────────────────────────────
   function physics(tg, dt) {
     if (tg.k > 0) {
@@ -917,9 +1080,11 @@ export function createCreature({
 
     if (sp > 40 && !carried && !bounce) {
       const before = Math.floor(hopPhase / PI);
-      hopPhase += dt * sp / (R * 2.2);
+      // at a sprint the steps stop getting quicker and land softer, or the
+      // squashes come faster than the body can spring back and pin it flat
+      hopPhase += dt * Math.min(sp, 520) / (R * 2.2);
       hop = Math.abs(Math.sin(hopPhase)) * R * 0.5 * clamp(sp / 300, 0.3, 1) * (1 - 0.55 * heavy);
-      if (Math.floor(hopPhase / PI) !== before) squash(0.25);
+      if (Math.floor(hopPhase / PI) !== before) squash(0.25 * clamp(300 / sp, 0.35, 1));
     } else hop *= Math.exp(-dt * 14);
 
     tick(S.sx, 80, 0.6, dt); tick(S.sy, 80, 0.6, dt);
@@ -931,6 +1096,7 @@ export function createCreature({
     full = Math.max(0, full - DIGEST * dt);
     belly.t = clamp(full, 0, 1.3);
     tick(belly, 22, 0.35, dt); tick(puff, 160, 0.5, dt);
+    for (const q of parcels) if (q.fall) { q.vy += 900 * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.rot += q.spin * dt; }
     for (const b of bits) { b.vy += 760 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= Math.exp(-dt * 2); }
     for (const g of germs) {
       const age = nowS() - g.born;
@@ -1134,8 +1300,9 @@ export function createCreature({
     // while it holds food the arms come round in front of the body, edged in
     // the page colour so they read against it
     const meal = eating && now - eating.since >= 0.3 && now - eating.since < 2.7 ? now - eating.since : 0;
+    const hug = parcel && parcelAt === 'chest';
     ctx.lineCap = 'round';
-    if (!meal) { ctx.strokeStyle = fg; ctx.lineWidth = R * 0.34 * sc; arms(); }
+    if (!meal && !hug) { ctx.strokeStyle = fg; ctx.lineWidth = R * 0.34 * sc; arms(); }
     // body
     const pts = outline();
     ctx.beginPath();
@@ -1190,6 +1357,13 @@ export function createCreature({
     if (mo > 0.06) { ctx.beginPath(); ctx.ellipse(0, my + mo * R * 0.05, R * 0.1 * mo * sc + 0.5, R * 0.14 * mo * sc + 0.5, 0, 0, TAU); ctx.fill(); }
     else if (happy > 0.25) { ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(0, my - R * 0.04 * sc, R * 0.13 * sc * happy, 0.35, PI - 0.35); ctx.stroke(); }
     ctx.translate(-fx * 1.1, 0);
+    if (parcel && !hug) drawParcel(fx * 0.4, -R * 1.5 * sc, sc, 0.04 * Math.sin(t * 3));   // up on its head
+    if (hug) {
+      // hugged to its chest, the arms round the front of it
+      drawParcel(fx * 0.8, R * 0.42 * sc, sc * 0.8, 0);
+      ctx.strokeStyle = bg; ctx.lineWidth = R * 0.34 * sc + 2.4; arms();
+      ctx.strokeStyle = fg; ctx.lineWidth = R * 0.34 * sc; arms();
+    }
     if (meal) {
       ctx.strokeStyle = bg; ctx.lineWidth = R * 0.34 * sc + 2.4; arms();
       ctx.strokeStyle = fg; ctx.lineWidth = R * 0.34 * sc; arms();
@@ -1202,7 +1376,39 @@ export function createCreature({
       }
     }
     drawBits(now);
+    drawFlying(now);
     drawBubble(now);
+  }
+
+  // a cardboard parcel, taped, with a radish stamp on it: it is from Mooli
+  function drawParcel(x, y, s, rot = 0) {
+    const w = R * 1.3 * s, h = R * 0.95 * s;
+    if (w < 1) return;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(rot);
+    ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(1, R * 0.07 * s);
+    ctx.fillStyle = '#C98F55'; ctx.strokeStyle = '#7A4E26';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, R * 0.12 * s); else ctx.rect(-w / 2, -h / 2, w, h);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#E8CF9F'; ctx.fillRect(-w * 0.1, -h / 2 + 1, w * 0.2, h - 2);
+    ctx.beginPath(); ctx.moveTo(-w / 2, -h * 0.2); ctx.lineTo(w / 2, -h * 0.2); ctx.stroke();
+    drawRadish(w * 0.29, h * 0.14, (R * 0.5 / 32) * s, -0.2);
+    ctx.restore();
+  }
+
+  // parcels between it and the page: arcing in and out of things, or tumbling
+  function drawFlying(now) {
+    if (!parcels.length) return;
+    const dpr = devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const q of parcels) {
+      const e = now - q.since;
+      if (q.fall) { ctx.globalAlpha = clamp(1 - (e - 0.5) / 0.4, 0, 1); drawParcel(q.x, q.y, 1, q.rot); continue; }
+      const u = clamp(e / q.dur, 0, 1), k = u * u * (3 - 2 * u);
+      drawParcel(q.x0 + (q.x1 - q.x0) * k, q.y0 + (q.y1 - q.y0) * k - Math.sin(PI * u) * R * 1.3, q.s0 + (q.s1 - q.s0) * k, 0.5 * Math.sin(PI * u));
+    }
+    ctx.globalAlpha = 1;
   }
 
   // a carrot virus: a carrot with a spiky leafy crown and a cross little face
@@ -1406,6 +1612,10 @@ export function createCreature({
     if (now > colourAt) { readColours(); colourAt = now + 1; }
     if (ptr.x != null && now - ptr.moved > 0.12) ptr.vx = ptr.vy = 0;
     for (let i = later.length - 1; i >= 0; i--) if (later[i].at <= now) later.splice(i, 1)[0].fn();
+    if (parcels.length) {
+      for (const q of parcels) if (!q.fall && !q.landed && now - q.since >= q.dur) { q.landed = true; q.then?.(); }
+      parcels = parcels.filter(q => q.fall ? now - q.since < 0.9 : !q.landed);
+    }
     if (flip && now - flip.since > (flip.dur || FLIP_TIME)) { flip = null; squash(0.4); jelly(3); S.happy.v = 1; }
     if (!arrived) { arrived = true; S.sc.v = 0.05; jelly(4); }
     const tg = think(now, dt);
@@ -1480,6 +1690,7 @@ export function createCreature({
     e.preventDefault(); swallowClick = true;
     if (block) { shoo(); return; }
     carried = { dx: e.clientX - p.x, dy: e.clientY - p.y, at: nowS(), x: e.clientX, y: e.clientY };
+    if (!packing) dropParcel();
     document.body.style.userSelect = 'none';
     jelly(3); S.lid.vel += 12;
     attended = null; inspect = null;
@@ -1533,6 +1744,7 @@ export function createCreature({
     attended = null; reading = null; block = null; inspect = null; glance = null; tending = null;
     hoarding = null; eating = null; refuse = null; act = null; crumbs = []; bits = []; germs = []; fight = null;
     afterAttend = 0; exit = null;
+    courier = null; catching = null; packing = null; parcel = false; parcels = [];
   }
 
   const api = {
@@ -1588,7 +1800,7 @@ export function createCreature({
     get hovered() { return ptr.over; },
     get active() { return active; },
     // too taken up with something else to go tidying
-    get busy() { return asleep || !!carried || !!eating || !!reading || !!tending || !!hoarding || nowS() < fleeUntil || !!flip || !!fight || germs.length > 0; },
+    get busy() { return asleep || !!carried || !!eating || !!reading || !!tending || !!hoarding || nowS() < fleeUntil || !!flip || !!fight || germs.length > 0 || !!courier || !!catching || !!packing; },
     // a carrot virus pops out of the page at (fromX, fromY) and heads for (x, y) to chew on it.
     // x values are client x, y values page y
     germ(x, y, fromX = x, fromY = y - R) {
@@ -1602,6 +1814,38 @@ export function createCreature({
       if (reducedMotion || !active) { done(); return; }
       if (tending && !tending.fixed) tending.done();
       tending = { el, done, since: nowS(), noticeAt: nowS() + rnd(0.7, 1.4), said: false, at: 0, fixed: false };
+    },
+    // Courier work. job is { from, to, mine, state, pace, onDrop }: from() and
+    // to() return the rects it carries between (null while they are not on the
+    // page), mine says which end is the visitor's own ('from' or 'to'), state()
+    // is 'wait' | 'go' | 'stuck' | 'idle' (see runCourier), pace() is 0..1 for
+    // how fast things are going, and onDrop() is called as each parcel goes in.
+    // courier(null) stops; a parcel already on its way is delivered first.
+    courier(job) {
+      if (reducedMotion) return;
+      if (!job) {
+        if (!courier) return;
+        if (parcel && courier.leg === 'carry') courier.ending = true;
+        else { poof(); courier = null; }
+        return;
+      }
+      touch();
+      courier = { job, leg: 'fetch', st: null, since: nowS(), busyUntil: 0, pending: false, trips: 0 };
+    },
+    get courierJob() { return courier?.job ?? null; },
+    // something is about to be dropped on rect(): it gets ready to catch it
+    expect(rect) { catching = reducedMotion ? null : rect || null; if (rect) touch(); },
+    // it wraps up a parcel and puts it on its head
+    pack() { if (reducedMotion || !active) return; touch(); packing = { since: nowS() }; parcel = true; jelly(2); },
+    // a delivery landed: confetti, and a flip if its hands are free
+    delivered() {
+      if (reducedMotion || !active) return;
+      touch();
+      for (let i = 0; i < 16; i++) bits.push({ x: p.x + rnd(-R, R), y: p.y - R, vx: rnd(-200, 200), vy: rnd(-380, -160), t: nowS(), col: pick(['#E9476B', '#5CCB78', '#F2C14E', '#7FB8F0', fg]), r: rnd(1.2, 2.4) });
+      say('delivered', { force: true });
+      S.happy.v = 1;
+      if (!flip && !carried && !parcel) { flip = { since: nowS(), dir: Math.random() < 0.5 ? -1 : 1, x: p.x, y: p.y }; S.tilt.v = S.tilt.vel = 0; jump(240); }
+      else jump(150);
     },
     // where it lives, px from the left edge; it walks there rather than jumping
     setMargin(x) { if (Number.isFinite(x)) MARGIN = x; },
