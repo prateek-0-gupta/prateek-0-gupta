@@ -2,8 +2,8 @@
 
 The creature is called **Mooli**, Hindi for radish (मूली), named on 17 October
 2026, after the bunny became the default. It knows its name: selecting "Mooli"
-on a page it is on gets "dats mi! mooli!", and the bunny sometimes greets you
-with "bwee-lo! mi mooli.".
+on a page it is on gets "dats mi! mooli!", and it introduces itself the first
+time it meets you ("...bwee-lo? mi mooli.").
 
 Mooli is on **every page except the tools and games**: one creature per visit, kept
 across client-side navigation (`k/js/components/mooli.js`, hooked in via
@@ -614,3 +614,107 @@ real public trackers (`mooli-drop.mjs` in the session scratchpad, modelled on
 `tests/speak2.mjs`): screenshots of catch, pack, wait, both ends mid-delivery,
 delivered, and the sender's tab closed mid-transfer; speech logged through the
 `fillText` hook.
+
+
+## 17. Reasons: from a dice roll to an inner life
+
+On 5 November 2026 Prateek asked for Mooli's default behaviour to be smarter,
+more interesting and more natural. The tricks were already there; what was
+missing was any reason for them. So this pass changes how it decides, and adds
+very little to what it can do.
+
+**What the baseline showed** (`tests/reasons-baseline.mjs`, run before any change):
+- Pointer strolling over the text for 40 s: Mooli's height correlated 0.79 with
+  the pointer's, 4,493 px of vertical travel. It rode the margin like a lift.
+- Left alone for 70 s it said "mm. flop" three times and never flopped.
+- Asleep, a 3 px mouse move on the far side of the screen woke it at once.
+
+**The bug worth telling: its habits had never run.** `startAct` was called from
+inside the frame's default branch, and the cleanup a few lines later saw that
+the current mode wasn't the act's and cancelled it, in the same frame. So every
+idle habit (flop, loaf, groom, periscope, zoomies from idling, the cat's
+saunter) fired its speech and vanished. The article's table of what the bunny
+does "while you are just reading" (sits, loafs, flops) described code that had
+never once played. Found because the new mode timeline read `home > sleep`.
+
+**What changed**, all in `k/js/components/margin-creature.js`:
+- **Inner state.** Energy, mood, arousal, boredom, novelty, and trust. They move
+  with what happens to it (table `FEELS`) and drift back. `pet.mood` shows them.
+- **Habits chosen for reasons** (`HABITS`, `chooseHabit`). Each scores how much
+  it feels like it right now, recently used ones count for less, and it picks in
+  proportion. It grooms after being handled, binkies only when happy and keyed
+  up, flops only where it feels safe, periscopes at somewhere new. "Still" is a
+  real option. A cooldown stops the same habit coming up three times running.
+- **A place to be** (`post`). It settles somewhere and stays until there is a
+  reason to go: the pointer has come to rest elsewhere for 1.6 s, what you are
+  reading has moved, or boredom. Small differences aren't a reason.
+- **Bouts.** It travels in hop-stop-look bursts, not a smooth slide.
+- **Attention** (`chooseGaze`). The eyes used to lock onto the pointer. Now the
+  pointer has to earn it (near, fast, or moving, and even then for a while), and
+  otherwise it looks at what you are reading, something on the page, you, or
+  nothing. Big gaze shifts usually come with a blink. Its eyes reach a link
+  before your pointer does (it extrapolates the pointer's path).
+- **Joint attention.** While pointing it looks at the thing, back at you, and at
+  the thing again; hover without clicking for 3.6 s and it may say "go-go?".
+- **Eyes first, then the body.** The body waits 140 ms before setting off for a
+  link, so sweeping over a list gets glances, not a creature charging up and
+  down the margin (37 px of travel over eight links in the test).
+- **Reading with you.** `bindPage` tells it which block is on the reading line
+  when you stop scrolling (`pet.dwell`). It sits level with it, eyes running
+  along the lines, and may have one quiet thought per topic per page. Scrolling
+  back up over what you read gets a head tilt. Reaching the end of a long page,
+  having read down it, gets a small bow ("finito! bapa.").
+- **Sleep with depth.** Lids get heavy and the head sinks until it jerks awake,
+  further each time; a tired or full creature gets there sooner. Disturbances add
+  up (`stir`, `rouse`): a little flicks an ear, more opens an eye a crack toward
+  it, enough wakes it, and it fades. Pointer close by wakes it fast, a radish
+  always does. It dreams about the last thing that stuck with it ("carroto...
+  grr...", "raddi... raddi..."), and wakes by itself when rested.
+- **Hunger.** With an empty belly for a few minutes it sits up, looks at you, its
+  stomach rumbles, "nom...?". This is the only hint anywhere that it eats.
+- **Rationed speech.** Anything unprompted spends a credit that comes back slowly
+  and a line used lately is less likely. Replies to what you just did are never
+  rationed. Its own adventures (tidying, carrots) now are.
+- **Memory.** `createCreature({ memory: 'mooli' })` keeps visits, last seen,
+  trust, radishes eaten and fullness in localStorage, in this browser only; nothing
+  is sent anywhere. Trust moves how close it comes, how hard it is to frighten,
+  how long it stays wary, and whether it plays tricks on you. Greetings depend on
+  it: it introduces itself to a stranger, says "bwee-lo! again-a!" to someone who
+  has been before, and "ooh! looong time-o!" after a week, with a binky. Thirty
+  minutes separates visits, so a reload is not a new one.
+- **Less intrusive.** It used to walk over to a pointer resting for 3 s, which is
+  usually a person reading, and stand on the text. Now 5 s, no scrolling for 25 s,
+  and every 45–90 s at most.
+
+**Regression caught while building it.** The first version made a stranger keep
+its distance with a fixed offset from the pointer, which made it back away, so
+it could not be petted or picked up. Now it stops approaching and never retreats.
+
+**Results** (`tests/reasons.mjs`, `tests/reasons2.mjs`; poses in `sheets/reasons/`):
+
+| Pointer strolling 40 s | Before | After |
+|---|---|---|
+| Correlation of its height with the pointer's | 0.79 | -0.26 (it isn't tracking) |
+| Vertical travel | 4,493 px | 872 px |
+
+- Single runs, and behaviour is random, so treat the figures as indicative.
+- Pointer settling low on the page: it comes over, arriving after about 4 s.
+- Someone present for 4 minutes, not touching it: 79% settled, with sniff, flop,
+  groom, loaf, periscope and beg in the rest; about 3 lines a minute, against
+  about 6 before speech rationing covered its own adventures.
+- Sleep: a 3 px move leaves it asleep (rouse 0), far sweeps rouse it to 0.65 and
+  it settles back, pointer close by wakes it.
+- Throwing it: trust 0.35 to 0.30, mood to -0.23, and trust survives a reload.
+- Regressions pass: pet, flip, meal, hold-too-long trance, carrots, selection,
+  link gestures, courier (`pet.courier` with synthetic rects, not a real transfer),
+  pup, cat, phone width, reduced motion. No page errors in any run.
+
+**Not checked.** All of this is headless Edge with synthetic input. Whether it
+*feels* right can only be judged by watching it. The numbers (cooldowns, trust
+steps, 120 px) are first guesses. Touch screens are still untested on a real device.
+
+**Evidence, in the same spirit as section 9.** Written from memory on the day and
+**not checked**; look these up before they go in the article: bouts of hopping and
+pausing as rabbit gait; rabbits being crepuscular (`twilight` makes it slightly
+livelier 5–9am and 5–9pm); grooming as displacement after a disturbance; blinks
+accompanying large gaze shifts (Evinger et al., 1994, I think).

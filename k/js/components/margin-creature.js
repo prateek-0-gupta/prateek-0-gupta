@@ -15,6 +15,16 @@
 // eyes that saccade and fixate rather than glide, and the body turning after
 // the eyes rather than with them.
 //
+// What keeps it from being a toy is that it has reasons. A few slow variables
+// (energy, mood, arousal, boredom, curiosity about what is new, and how far it
+// trusts you) decide which habit it picks, so it grooms after being handled,
+// binkies because it is happy rather than because a die said so, and asks for
+// food when it hasn't eaten. It picks a spot and stays there until it has a
+// reason to move, travels in hop-stop-look bouts, shares its attention between
+// you, the page and what you are reading, nods off before it sleeps, sleeps
+// deeply enough that a twitch of the mouse only flicks an ear, dreams about its
+// day, rations its speech, and, given a memory key, remembers you next visit.
+//
 // No dependencies and nothing site-specific:
 //   import { createCreature, bindPage } from './margin-creature.js';
 //   const pet = createCreature();           // makes its own fixed canvas
@@ -30,6 +40,10 @@
 //   pet.feed(pageX, pageY)     drop a radish; it eats it, and gets a belly if you overdo it
 //   pet.scroll(dy)             the page moved under it
 //   pet.read(rect | null, text?)  read along with whatever rect() returns, and say what it makes of text
+//   pet.dwell(el | null, text?)   you have settled on this part of the page: it sits level with it and reads quietly
+//   pet.greet()                hello, according to whether it knows you
+//   pet.finished()             you reached the end of the page
+//   pet.mood                   what it is up to and how it feels, for tests and curious people
 //   pet.fix(el, done)          go and put something straight; done() is when it springs back
 //   pet.germ(x, y, fromX, fromY)  a carrot virus pops out and heads for (x, y); it gets chased off
 //   pet.say(key | text)        say one of its words (hello, cheer, look...) or anything
@@ -61,6 +75,17 @@ const nowS = () => performance.now() / 1000;
 const spring = (v = 0) => ({ v, vel: 0, t: v });
 const tick = (s, k, z, dt) => { s.vel += (k * (s.t - s.v) - 2 * Math.sqrt(k) * z * s.vel) * dt; s.v += s.vel * dt; };
 
+// what it remembered of you last time, if it was asked to remember
+function recall(key) {
+  const blank = { visits: 0, lastSeen: 0, trust: 0.35, fed: 0, full: 0 };
+  if (!key) return blank;
+  try {
+    const saved = JSON.parse(localStorage.getItem(key)) || {};
+    for (const k of Object.keys(blank)) if (Number.isFinite(saved[k])) blank[k] = saved[k];
+  } catch { /* nothing readable: a stranger, then */ }
+  return blank;
+}
+
 export function createCreature({
   canvas = null,
   radius = 17,          // body radius, px
@@ -72,6 +97,7 @@ export function createCreature({
   font = null,          // typeface for its speech; defaults to body's
   talk = true,          // whether it says things at all
   personality = null,   // 'pup', 'cat' or 'bunny' for an animal's habits on top of its own; null for neither
+  memory = null,        // a localStorage key to remember the visitor under, on their own machine; null to forget them
 } = {}) {
   const R = radius, N = 20, ARM = R * 0.95;
   let MARGIN = margin;
@@ -124,7 +150,6 @@ export function createCreature({
   let refuse = null;                                       // { until }: no-no, full
   let asleep = false, zs = [], nextZ = 0;
   let fidget = null, nextFidgetAt = nowS() + 5, nextBlinkAt = nowS() + 2;
-  let wander = null, wanderUntil = 0;
   let wind = 0, arrived = false, swallowClick = false;
   let dizzyUntil = 0, giggleUntil = 0;
   const circling = { a: null, turned: 0, since: 0 };     // pointer orbiting it: how far round, since when
@@ -134,6 +159,62 @@ export function createCreature({
   const later = [];                                       // [{ at, fn }]: timed impulses, run by the loop
   const hour = new Date().getHours(), night = hour >= 23 || hour < 6;
   if (night) sleepAfter *= 0.6;                           // past bedtime it nods off sooner
+  // rabbits are crepuscular: liveliest around dawn and dusk (from memory, unchecked; see NOTES.md)
+  const twilight = (hour >= 5 && hour < 9) || (hour >= 17 && hour < 21);
+
+  // ── its inner life ──
+  // Slow variables that the moment-to-moment decisions lean on. They move with
+  // what happens to it and drift back on their own.
+  const inner = {
+    energy: 1,        // 1 fresh, 0 worn out; spent awake, restored asleep
+    valence: 0.05,    // mood, -1..1
+    arousal: 0.35,    // how keyed up, 0..1
+    boredom: 0,       // rises while nothing happens, 0..1
+    novelty: 1,       // something here is new, 0..1
+    ruffled: -1e9,    // when it was last handled or frightened
+  };
+  const feel = (dv = 0, da = 0) => {
+    inner.valence = clamp(inner.valence + dv, -1, 1);
+    inner.arousal = clamp(inner.arousal + da, 0, 1);
+  };
+  // what a state does to how it feels, on walking into it: [mood, arousal, trust]
+  const FEELS = {
+    pet: [0.15, 0.1, 0.012], eat: [0.3, 0.25, 0.04], giggle: [0.25, 0.4, 0.01], read: [0.05, 0.1, 0.005],
+    tend: [0.05, 0.1, 0], fight: [0.1, 0.7, 0], attend: [0.02, 0.05, 0],
+    carry: [0, 0.4, 0], flee: [-0.15, 0.7, -0.015], dizzy: [-0.1, 0.3, -0.01],
+    thrown: [-0.3, 0.8, -0.05], trance: [-0.35, 0.8, -0.06],
+  };
+  const RUFFLING = new Set(['carry', 'trance', 'thrown', 'flee', 'dizzy', 'giggle']);
+  const CALM_MODES = new Set(['home', 'follow', 'sleep']);
+  let lastThing = null;                                   // the last thing that stuck with it; it dreams about it
+
+  // ── what it remembers of you, across visits ──
+  const SAME_VISIT = 30 * 60;                             // seconds; a reload is not a new visit
+  const mem = recall(memory);
+  const awaySeconds = mem.lastSeen ? Math.max(0, (Date.now() - mem.lastSeen) / 1000) : Infinity;
+  const visitNo = awaySeconds > SAME_VISIT ? mem.visits + 1 : Math.max(1, mem.visits);
+  let trust = clamp(mem.trust, 0, 1);                     // grows with food and fuss, falls when you throw it about
+  if (Number.isFinite(awaySeconds)) { full = Math.max(0, mem.full - DIGEST * awaySeconds); belly.v = belly.t = full; }
+  let lastMeal = nowS(), saveAt = 0;
+  function remember() {
+    if (!memory) return;
+    try { localStorage.setItem(memory, JSON.stringify({ visits: visitNo, lastSeen: Date.now(), trust: +trust.toFixed(3), fed: mem.fed, full: +full.toFixed(3) })); } catch { /* private window: it just won't remember */ }
+  }
+
+  // ── where it has settled, and how it gets about ──
+  let post = null;                                        // { x, y, movedAt }: stays put until there is a reason to go
+  const band = { y: null, since: 0 };                     // the height the pointer has settled at
+  const gait = { go: true, until: 0 };                    // bouts: a few hops, stop, look, a few more
+  // ── what you are up to ──
+  const reader = { lastScroll: -1e9, speed: 0, run: 0, dir: 0, armed: false, nextTilt: 0 };
+  let focus = null;                                       // { el, text, since, said }: the part of the page you settled on
+  const mused = new Set();                                // topics it has already had a thought about, on this page
+  const isReading = now => !!focus && now - reader.lastScroll < 25 && now - ptr.moved > 1.5;
+  // ── what it is paying attention to ──
+  let gz = { kind: null, until: 0 };                      // { kind, until, el?, x?, y? }: held for a while, then it moves on
+  let aheadEl = null, aheadAt = 0;                        // the link your pointer seems to be heading for
+  // ── sleep ──
+  let rouse = 0, sleptAt = 0, nextDream = 0, flickAt = 0;
 
   // eyes dart and fixate rather than glide; the body turns after them
   const sac = [spring(0), spring(0)];
@@ -195,8 +276,21 @@ export function createCreature({
     dropin:   ['plop!', 'in-a go!', 'tikka!'],
     delivered:['ta-da! deliver-o!', 'all dere! bapa!', 'signa here!'],
     lost:     ['uh-oh... gone-a?', 'hullo-o? come back-a...'],
+    shy:      ['...bwee-lo? mi mooli.', 'oo. bwee-lo. mi mooli?'],
+    again:    ['oh! you-a! bwee-lo!', 'bwee-lo! again-a!', 'hehe. you back-a.'],
+    longtime: ['ooh! looong time-o!', 'you! you! bwee-lo!'],
+    late:     ['bwee-lo... late-a. mimi?', 'shh... night-o.'],
+    nudge:    ['go-go?', 'dis one? yes?', 'click-a?'],
+    reread:   ['hm? back-a?', 'oo? again dat?'],
+    finished: ['finito! bapa.', 'all read-a! bapa!', 'da end! hehe.'],
+    hungry:   ['nom...?', 'raddi...?', 'belly go grrr.'],
   };
-  const THOUGHTS = new Set(['think', 'sleep', 'read', 'inspect', 'yawn', 'babble']);
+  const THOUGHTS = new Set(['think', 'sleep', 'read', 'inspect', 'yawn', 'babble', 'hungry', 'reread', 'dream']);
+  // what it dreams about: whatever stuck with it last
+  const DREAMS = {
+    fed: ['raddi... raddi...', 'nom... nom...'], fight: ['carroto... grr...', 'pow... pow...'],
+    thrown: ['wheee... eep...'], pet: ['mmm... scritchi...'], none: ['zz... mimi...', 'bwee... lo...'],
+  };
   const SYL = ['ba', 'po', 'mi', 'lo', 'ki', 'ta', 'nu', 'bee', 'la', 'pi', 'do', 'ka', 'mu', 'tee', 'bo', 'ya'];
   const pick = a => a[Math.random() * a.length | 0];
   const babble = () => {
@@ -205,11 +299,25 @@ export function createCreature({
   };
   const bubblePop = spring(0);
   let bubble = null, lastSpoke = 0, fontFamily = font || 'serif';
-  // chance: how likely it is to bother; force: talk over whatever it was saying
+  // Speech is rationed. Anything it says unprompted spends a credit that comes
+  // back slowly, and a line it has used lately is less likely to come again, so
+  // it stays a surprise. force is for answering something you just did, and is
+  // never rationed. chance: how likely it is to bother.
+  const heard = {};
+  let talkCredit = 1.5, creditAt = nowS();
   function say(key, { chance = 1, force = false, text = null } = {}) {
-    if (!talk || reducedMotion || Math.random() > chance) return;
+    if (!talk || reducedMotion) return;
     const now = nowS();
-    if (!force && now - lastSpoke < 1.1) return;
+    const h = heard[key], tired = h ? h.n * 0.5 ** ((now - h.at) / 90) : 0;
+    if (Math.random() > (force ? chance : chance / (1 + 0.7 * tired))) return;
+    if (!force) {
+      if (asleep && key !== 'dream' && key !== 'sleep') return;
+      if (now - lastSpoke < 1.1) return;
+      talkCredit = Math.min(2, talkCredit + (now - creditAt) / 22); creditAt = now;
+      if (talkCredit < 1) return;
+      talkCredit -= 1;
+    }
+    heard[key] = { n: tired + 1, at: now };
     text = text ?? (key === 'babble' ? babble() : pick(VOICE[key] || WORDS[key] || WORDS.look));
     bubble = { text, kind: THOUGHTS.has(key) ? 'think' : 'say', since: now, until: now + 1.4 + text.length * 0.055 };
     lastSpoke = now; bubblePop.v = 0.35; bubblePop.vel = 0; bubblePop.t = 1;
@@ -289,27 +397,70 @@ export function createCreature({
     if (PUP && Math.random() < 0.45) zoom();
     else if (BUN && Math.random() < 0.6) frisky();
   }
-  // something of its own to do while idle; false to leave it to the shared fidgets
-  function idleAct(dp, pd) {
-    const r = Math.random();
-    if (PUP) {
-      if (r < 0.2) { zoom(); return true; }
-      if (r < 0.55 && dp) { startAct('headtilt', 1.4, { dir: dp.x > 0 ? 1 : -1 }); say('tilt', { chance: 0.5 }); return true; }
-      if (r < 0.8) { startAct('playbow', 1.0); say('bow', { chance: 0.6 }); return true; }
-    } else if (CAT) {
-      if (r < 0.4) { startAct('loaf', rnd(5, 9)); return true; }
-      if (r < 0.75) { startAct('groom', 1.8); return true; }
-      if (dp && pd < 260) { startAct('slowblink', 1.5); return true; }
-    } else if (BUN) {
-      // at ease: loafed with paws tucked, or flopped right over (PDSA; Omlet)
-      if (r < 0.2) { startAct('loaf', rnd(5, 9)); return true; }
-      if (r < 0.4) { startAct('flop', rnd(4, 7), { dir: Math.random() < 0.5 ? -1 : 1 }); say('flop', { chance: 0.6 }); return true; }
-      if (r < 0.5) { startAct('periscope', 1.6); return true; }
-      if (r < 0.6) { binky(); return true; }
-      if (r < 0.85) { startAct('groom', 1.6); return true; }      // washing its face
+  // What it might do with itself. Each habit scores how much it feels like doing
+  // that right now, given c: { energy, valence, arousal, boredom, novelty,
+  // ruffled, hunger, reading, stillFor, dp, pd }. A habit it did lately counts for
+  // less until its cool (seconds) has passed. It picks among them in proportion,
+  // and 'still' is a real choice: most of an animal's day is doing nothing much.
+  // who limits a habit to some personalities, by first letter.
+  const HABITS = [
+    { name: 'still', cool: 0, score: c => 0.45 + 0.5 * c.reading, run: () => 0 },
+    { name: 'loaf', who: 'bc', cool: 25, score: c => 0.2 + 0.5 * (1 - c.energy) + 0.25 * c.reading, run: () => { const d = rnd(5, 9); startAct('loaf', d); return d; } },
+    // at ease: flopped right over, only where it feels safe (PDSA; Omlet)
+    { name: 'flop', who: 'b', cool: 60, score: c => c.valence > 0 && trust > 0.3 ? 0.25 + 0.6 * (1 - c.energy) + 0.4 * c.valence : 0,
+      run: () => { const d = rnd(4, 7); startAct('flop', d, { dir: Math.random() < 0.5 ? -1 : 1 }); say('flop', { chance: 0.5 }); return d; } },
+    // washing, which it mostly needs after being handled or scared
+    { name: 'groom', who: 'bc', cool: 30, score: c => 0.15 + 1.2 * c.ruffled, run: () => { startAct('groom', 1.7); return 1.7; } },
+    { name: 'periscope', who: 'b', cool: 30, score: c => c.novelty + 0.2 * c.arousal, run: () => { startAct('periscope', 1.6); inner.novelty *= 0.4; return 1.6; } },
+    { name: 'binky', who: 'b', cool: 40, score: c => c.valence > 0.3 && c.arousal > 0.35 ? 1 : 0, run: () => { binky(); return 0.7; } },
+    { name: 'sniff', who: 'b', cool: 14, score: c => 0.35 + 0.2 * c.boredom, run: () => { const d = rnd(1.6, 3); startAct('sniff', d); return d; } },
+    // off to look at another bit of the margin
+    { name: 'explore', cool: 18, score: c => 0.1 + 0.9 * c.boredom * c.energy * (c.reading ? 0.3 : 1),
+      run: () => {
+        const span = rnd(70, 200), up = post.y > innerHeight * 0.6 || (post.y > innerHeight * 0.3 && Math.random() < 0.5);
+        movePost(post.y + (up ? -span : span));
+        inner.boredom *= 0.5;
+        return 1;
+      } },
+    { name: 'stretch', cool: 40, score: c => c.stillFor > 20 ? 0.3 : 0.05, run: () => { fidget = { name: 'stretch', since: nowS(), until: nowS() + 1.5 }; say('stretch', { chance: 0.35 }); return 1.5; } },
+    { name: 'yawn', cool: 25, score: c => 0.7 * (1 - c.energy) + (night ? 0.2 : 0), run: () => { fidget = { name: 'yawn', since: nowS(), until: nowS() + 1.3 }; say('yawn', { chance: 0.5 }); return 1.3; } },
+    // a soft look at someone it likes
+    { name: 'softlook', cool: 30, score: c => c.dp && trust > 0.5 ? 0.15 + 0.3 * trust : 0, run: () => { startAct('slowblink', 1.5); return 1.5; } },
+    // peckish: it sits up and asks, which is also how people find out it eats
+    { name: 'beg', cool: 100, score: c => 0.9 * c.hunger, run: () => { startAct('beg', 2.2); say('hungry', { chance: 0.9 }); return 2.2; } },
+    { name: 'muse', cool: 60, score: () => 0.08, run: () => { say('babble'); return 0; } },
+    { name: 'hop', cool: 16, score: c => 0.25 * c.arousal, run: () => { jump(140); return 0.4; } },
+    { name: 'shiver', cool: 20, score: c => 0.3 * c.ruffled, run: () => { fidget = { name: 'shiver', since: nowS(), until: nowS() + 0.5 }; return 0.5; } },
+    { name: 'zoomies', who: 'p', cool: 25, score: c => 0.3 * c.energy + 0.3 * Math.max(0, c.valence), run: () => { zoom(); return 2.6; } },
+    { name: 'headtilt', who: 'p', cool: 8, score: c => c.dp ? 0.5 : 0, run: c => { startAct('headtilt', 1.4, { dir: c.dp.x > 0 ? 1 : -1 }); say('tilt', { chance: 0.5 }); return 1.4; } },
+    { name: 'playbow', who: 'p', cool: 15, score: c => 0.35 * c.energy, run: () => { startAct('playbow', 1.0); say('bow', { chance: 0.6 }); return 1; } },
+    { name: 'slowblink', who: 'c', cool: 14, score: c => c.dp && c.pd < 260 ? 0.4 : 0, run: () => { startAct('slowblink', 1.5); return 1.5; } },
+  ];
+  const lastDid = {};
+  // picks one, does it, and returns how long it will take
+  function chooseHabit(now, dp, pd) {
+    const c = {
+      energy: inner.energy, valence: inner.valence, arousal: inner.arousal, boredom: inner.boredom, novelty: inner.novelty,
+      ruffled: clamp(1 - (now - inner.ruffled) / 18, 0, 1),
+      hunger: full < 0.12 ? clamp((now - lastMeal - 90) / 150, 0, 1) : 0,
+      reading: isReading(now) ? 1 : 0, stillFor: now - (post?.movedAt ?? now), dp, pd,
+    };
+    const options = [];
+    let total = 0;
+    for (const h of HABITS) {
+      if (h.who && !h.who.includes(personality?.[0])) continue;
+      const since = now - (lastDid[h.name] ?? -1e9);
+      const w = Math.max(0, h.score(c)) * (h.cool ? clamp(since / h.cool, 0, 1) ** 2 : 1);
+      if (w > 0) { options.push([h, w]); total += w; }
     }
-    return false;
+    let r = Math.random() * total;
+    for (const [h, w] of options) {
+      r -= w;
+      if (r <= 0) { lastDid[h.name] = now; return h.run(c) || 0; }
+    }
+    return 0;
   }
+
   // one frame of a habit: sets the pose on tg, returns where to look (or undefined)
   function runAct(a, tg, now, dp) {
     const e = now - a.since, u = e / (a.until - a.since);
@@ -369,6 +520,20 @@ export function createCreature({
         tg.lid = 1.1;
         return { x: Math.sin(e * 3.4) * 0.9, y: -0.15, abs: true };
       }
+      case 'sniff': {                                        // nose down, working along the ground
+        const w = Math.sin(e * 2.1);
+        tg.sy = 0.9; tg.sx = 1.06; tg.lid = 0.78; tg.tilt = 0.06 * w;
+        tg.arms = [[1.3, 0.4], [PI - 1.3, 0.4]];
+        return { x: 0.55 * w, y: 0.85, abs: true };
+      }
+      case 'beg': {                                          // sat up, paws in, looking right at you
+        const up = Math.min(1, e * 4);
+        a.y0 ??= p.y;
+        tg.sy = 1 + 0.14 * up; tg.sx = 1 - 0.08 * up; tg.y = a.y0 - R * 0.1 * up; tg.k = 60;
+        tg.arms = [[1.95, 0.45], [PI - 1.95, 0.45]]; tg.lid = 1.05; tg.happy = 0.2;
+        if (!a.rumbled && e > 0.5) { a.rumbled = true; for (let i = 7; i < 14; i++) wobV[i] += 2; }   // its stomach rumbles
+        return { x: 0, y: -0.05, abs: true };
+      }
       case 'saunter':                                        // tail up, walking off, done with you
         tg.x = a.x; tg.y = a.y; tg.k = 30; tg.vmax = 200; tg.lid = 0.55;
         return { x: Math.sign(a.x - p.x) * 0.6, y: -0.6, abs: true };
@@ -399,6 +564,11 @@ export function createCreature({
     [/writ|article|read/i,                                     ['wordos! bapa.']],
   ];
   const STOP = new Set('the and for with that this from have about which what were your into they their there them just than then also mostly'.split(' '));
+  // a thought about what you are reading: only if it has a real one, and only once a page per topic
+  function topicLine(text) {
+    for (const [re, lines] of TOPICS) if (!mused.has(re) && re.test(text)) { mused.add(re); return pick(lines); }
+    return null;
+  }
   function reactTo(text) {
     const t = text.replace(/\s+/g, ' ').trim();
     if (!t) return;
@@ -428,6 +598,19 @@ export function createCreature({
     later.push({ at: nowS() + 0.07, fn: () => { v.y -= a; S.sy.vel += a * 0.014; S.sx.vel -= a * 0.008; } });
   };
   const touch = () => { lastActivity = nowS(); if (asleep) wake(); };
+  // something happened somewhere. Awake, that only means you are about. Asleep,
+  // it adds up: a little flicks an ear, enough wakes it, and it fades again.
+  function stir(amount) {
+    if (!asleep) { lastActivity = nowS(); return; }
+    rouse += amount;
+    const now = nowS();
+    if (rouse >= 1) { wake(); return; }
+    if (amount > 0.002 && now > flickAt) { flickAt = now + 0.7; ear.vel += 6; tip.vx += rnd(-70, 70); }
+  }
+  function fallAsleep() {
+    if (asleep) return;
+    asleep = true; rouse = 0; sleptAt = nowS(); nextZ = sleptAt + 0.8; nextDream = sleptAt + rnd(8, 16); act = null;
+  }
   // a double-click trick: one clean flip in the air, eased in and out, then a
   // squashy landing. Its own angle, so it never fights the tilt spring.
   const FLIP_TIME = 0.62;
@@ -438,10 +621,13 @@ export function createCreature({
     if (flip.twist) return flip.dir * flip.twist * Math.sin(PI * u);   // a binky: twist and back
     return flip.dir * TAU * (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
   };
-  function wake() {
-    asleep = false; S.lid.t = 1; S.lid.vel += 20; squash(-0.3); jelly(3);
-    say('wake', { chance: 0.8, force: true });
-    fidget = { name: 'stretch', since: nowS(), until: nowS() + 1.4 };
+  function wake({ quiet = false } = {}) {
+    const now = nowS();
+    asleep = false; rouse = 0; lastActivity = now; S.lid.t = 1; S.lid.vel += 20; squash(-0.3); jelly(3);
+    if (!quiet && now - sleptAt > 6) say('wake', { chance: 0.8, force: true });
+    feel(0, quiet ? 0.05 : 0.2);
+    fidget = { name: quiet ? 'yawn' : 'stretch', since: now, until: now + 1.4 };
+    nextFidgetAt = now + rnd(4, 8);
   }
   const reach = (dx, dy) => {
     let a = Math.atan2(dy, dx);
@@ -488,7 +674,8 @@ export function createCreature({
     const ph = t * 1.6, breath = Math.sin(ph + 0.45 * Math.sin(ph));
     tg.sy += 0.02 * breath; tg.sx -= 0.009 * breath;
     if (night) tg.lid = 0.85;
-    const home = { x: MARGIN, y: clamp(ptr.y ?? innerHeight * 0.4, R + 12, innerHeight - R - 12) };
+    post ??= { x: MARGIN, y: clamp(p.y, R + 12, innerHeight - R - 12), movedAt: now };
+    const home = post;
     const dp = ptr.x != null ? { x: ptr.x - p.x, y: ptr.y - p.y } : null;
     const pd = dp ? Math.hypot(dp.x, dp.y) : 1e9;
     const pspeed = Math.hypot(ptr.vx, ptr.vy);
@@ -497,14 +684,15 @@ export function createCreature({
     // the pointer just left the window: keep an eye on where it went
     if (!dp && exit && now - exit.t < 4) look = { x: exit.x - p.x, y: exit.y - p.y };
     let mode = 'home';
-    let foe = null, cr = null, cw = null;
+    let foe = null, cr = null, cw = null, drowsy = 0, droop = 0;
     parcelAt = 'head';
 
     if (tending && !tending.fixed && (now - tending.since > 10 || !tending.el.isConnected)) { tending.fixed = true; tending.done(); tending = null; }
 
     // a reflex that interrupts anything: something is rushing at it
-    if (!carried && dp && pspeed > 1300 && pd < 260 && now > fleeUntil && (dp.x * ptr.vx + dp.y * ptr.vy) < -0.5 * pd * pspeed) {
-      fleeUntil = now + 0.9; waryUntil = now + 4;
+    // the more it trusts you, the more it takes to frighten it, and the sooner it gets over it
+    if (!carried && !asleep && dp && pspeed > 1000 + 600 * trust && pd < 260 && now > fleeUntil && (dp.x * ptr.vx + dp.y * ptr.vy) < -0.5 * pd * pspeed) {
+      fleeUntil = now + 0.9; waryUntil = now + 2.5 + 4 * (1 - trust);
       const ax = -dp.x / pd, ay = -dp.y / pd;
       fleeTo = { x: clamp(p.x + ax * 240 + rnd(-40, 40), R + 8, innerWidth - R - 8), y: clamp(p.y + ay * 240 + rnd(-40, 40), R + 8, innerHeight - R - 8) };
       S.scared.v = 1; jelly(6, 3); touch();
@@ -629,12 +817,12 @@ export function createCreature({
           const g = fight.germ, dir = Math.random() < 0.5 ? -1 : 1;
           Object.assign(g, { state: 'launched', launchedAt: now, x: fight.x, y: fight.y + scrollY, vx: dir * rnd(220, 320), vy: -rnd(420, 520), spin: dir * rnd(10, 16) });
           for (let i = 0; i < 12; i++) bits.push({ x: fight.x + rnd(-R, R), y: fight.y + rnd(-R, R), vx: rnd(-170, 170), vy: rnd(-220, -40), t: now, col: i % 3 ? ink : '#F28C28', r: rnd(1, 2.4) });
-          fight = null; S.happy.v = 1; jump(160); jelly(4); say('won', { force: true });
+          fight = null; S.happy.v = 1; jump(160); jelly(4); say('won');
         }
       } else {
         // spotted one: narrow eyes, fists up, charge
         const gx = foe.x, gy = foe.y - scrollY;
-        if (!foe.spotted) { foe.spotted = true; say('germ', { force: true }); }
+        if (!foe.spotted) { foe.spotted = true; say('germ'); }
         tg.x = gx - R * 0.8 * (Math.sign(gx - p.x) || 1); tg.y = gy; tg.k = 120; tg.vmax = 900;
         tg.lid = 0.72; tg.mouth = 0.25; tg.arms = [[-0.3, 1.05], [PI + 0.3, 1.05]];
         look = { x: gx - p.x, y: gy - p.y };
@@ -687,16 +875,27 @@ export function createCreature({
       if (atStart) { tx = r.left - 2; ty = r.top + r.height / 2; }
       else { tx = r.left + r.width / 2; ty = r.top + 1; }
       const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy) || 1;
-      const g = (G[attended.gesture] || G.point)({ dx: dx / d, dy: dy / d, t: now - attended.since });
+      const age = now - attended.since;
+      const restArms = tg.arms;
+      const g = (G[attended.gesture] || G.point)({ dx: dx / d, dy: dy / d, t: age });
       merge(tg, g);
       const span = R * (1.1 + 1.25 * (g.sc || 1));
       if (atStart) { tg.x = Math.max(R + 4, tx - span); tg.y = ty + 2; }      // stand just left of it
       else { tg.x = tx; tg.y = r.top - R * 1.55 * (g.sc || 1); }             // mid-line: perch above, point down
       tg.k = 90; tg.vmax = 700;
-      if (g.beat && Math.floor((now - attended.since) * g.beat) !== Math.floor((now - dt - attended.since) * g.beat)) jump(90);
+      // the eyes go at once, the body a moment later, so a pointer passing over
+      // a list gets glances, not a creature hurtling up and down the margin
+      if (age < 0.14) { tg.x = p.x; tg.y = p.y; tg.k = 30; tg.arms = restArms; }
+      if (!attended.spoke && age > 0.22) {
+        attended.spoke = true;
+        const gn = attended.gesture;
+        say(gn === 'point' ? 'look' : gn, { chance: gn === 'point' ? 0.35 : 0.85 });
+      }
+      // you have been hovering a while without clicking: a little encouragement
+      if (!attended.nudged && age > 3.6) { attended.nudged = true; S.sy.vel -= 1.5; say('nudge', { chance: 0.5 }); }
+      if (g.beat && Math.floor(age * g.beat) !== Math.floor((age - dt) * g.beat)) jump(90);
       // rabbits chin-mark novel objects (Martinez-Gomez et al. 1997; and on novelty, 2010):
       // a new link gets its chin rubbed on it, once, after the gesture has landed
-      const age = now - attended.since;
       if (BUN && !chinned.has(attended.el) && age > 0.7) {
         if (age < 1.6) {
           tg.tilt = 0.14 * Math.sin(age * 18); tg.sy = 0.9; tg.lid = 0.6; tg.happy = 0.4;
@@ -705,7 +904,9 @@ export function createCreature({
           lookSet = true;
         } else chinned.add(attended.el);
       }
-      if (!lookSet) look = g.look ? { x: g.look[0], y: g.look[1], abs: true } : { x: dx, y: dy };
+      // joint attention: it looks at the thing, back at you, and at the thing again
+      const checking = age > 1.9 && (age - 1.9) % 2.6 < 0.6;
+      if (!lookSet) look = g.look ? { x: g.look[0], y: g.look[1], abs: true } : checking ? { x: 0, y: -0.05, abs: true } : { x: dx, y: dy };
     } else if (tending && now > tending.noticeAt) {
       mode = 'tend';
       const r = tending.el.getBoundingClientRect();
@@ -716,14 +917,14 @@ export function createCreature({
       tg.k = 90; tg.vmax = 650;
       const dx = r.left + r.width * 0.5 - p.x, dy = r.top + r.height * 0.4 - p.y, d = Math.hypot(dx, dy) || 1;
       look = { x: dx, y: dy };
-      if (!tending.said) { tending.said = true; say('crooked', { force: true }); }
+      if (!tending.said) { tending.said = true; say('crooked', { chance: 0.7 }); }
       if (!tending.at && Math.hypot(tg.x - p.x, tg.y - p.y) < R * 0.9) tending.at = now;
       if (tending.at) {
         const e = now - tending.at, nudge = Math.max(0, Math.sin(e * 9));
         const a = reach(dx / d, dy / d), i = a[0] ? 0 : 1;
         a[i][1] = 0.75 + 0.35 * nudge; tg.arms[i] = a[i];          // reach out, nudge, nudge
         tg.sy = 1 - 0.05 * nudge; tg.lid = 0.85; tg.mouth = 0.15;
-        if (e > 0.75 && !tending.fixed) { tending.fixed = true; tending.done(); jelly(2); S.happy.v = 1; say('fixed', { force: true }); }
+        if (e > 0.75 && !tending.fixed) { tending.fixed = true; tending.done(); jelly(2); S.happy.v = 1; say('fixed'); }
         if (e > 1.6) { tending = null; afterAttend = now + 1; }
       }
     } else if (reading && now - reading.since > 0.35 && reading.rect()?.width) {
@@ -771,10 +972,20 @@ export function createCreature({
       if (lk !== undefined) look = lk;
     } else if (asleep) {
       mode = 'sleep';
-      tg.x = home.x; tg.y = p.y; tg.k = 10; tg.lid = 0.04; tg.sy = 0.9 + 0.03 * Math.sin(now * 1.9); tg.sx = 1.06;
+      tg.x = p.x; tg.y = p.y; tg.k = 10; tg.sy = 0.9 + 0.03 * Math.sin(now * 1.9); tg.sx = 1.06;
       tg.arms = [[1.25, 0.35], [PI - 1.25, 0.35]];
-      look = null;
+      // half roused: an eye opens a crack toward whatever disturbed it
+      tg.lid = 0.04 + 0.5 * clamp((rouse - 0.25) * 1.6, 0, 1);
+      look = rouse > 0.35 && dp ? dp : null;
       if (now > nextZ) { zs.push({ x: p.x + R * 0.9, y: p.y - R, t: now }); nextZ = now + rnd(1.3, 2.2); }
+      // dreaming: a paw twitches, an ear goes, now and then what it is dreaming about
+      if (now > nextDream) {
+        nextDream = now + rnd(9, 20);
+        jelly(1.5); ear.vel += 5; S.arms[Math.random() < 0.5 ? 0 : 1][0].vel += rnd(-9, 9);
+        say('dream', { chance: 0.35, text: pick(DREAMS[lastThing] || DREAMS.none) });
+      }
+      // slept enough: it wakes by itself, and doesn't make a fuss about it
+      if (inner.energy > 0.97 && now - sleptAt > 75 && !document.hidden) wake({ quiet: true });
     } else if (inspect && now < inspect.until) {
       mode = 'inspect';
       const side = inspect.x > innerWidth * 0.5 ? -1 : 1;
@@ -784,24 +995,36 @@ export function createCreature({
       if (inspect.poked && now - inspect.poked < 0.9) { const u = Math.sin((now - inspect.poked) / 0.9 * PI); const a = reach(side, 0.1); const i = a[0] ? 0 : 1; a[i][1] *= u; tg.arms[i] = a[i]; tg.lid = 0.75; }
       if (inspect.poked && now - inspect.poked > 1.2) tg.tilt = side * 0.12;
     } else {
-      if (dp && !CAT && ptr.x < MARGIN + (PUP ? 320 : 70) && now > waryUntil) {
+      updatePost(now);
+      const wary = now < waryUntil;
+      if (dp && !CAT && ptr.x < MARGIN + (PUP ? 320 : 70) && !wary) {
+        // you came into its margin: it comes over, stopping further off if it
+        // doesn't know you yet. It stops, it doesn't back away, so you can still reach it.
         mode = 'follow';
-        tg.x = ptr.x - 34; tg.y = ptr.y + 28; tg.k = PUP ? 30 : 22; tg.vmax = PUP ? 540 : 420; tg.happy = PUP ? 0.7 : 0.3;
+        const gap = PUP ? 34 : 34 + 46 * (1 - trust), closer = Math.max(0, 1 - gap / pd);
+        tg.x = p.x + dp.x * closer; tg.y = p.y + dp.y * closer; tg.k = PUP ? 30 : 22; tg.vmax = PUP ? 540 : 420; tg.happy = PUP ? 0.7 : 0.3;
+        post.y = clamp(tg.y, R + 12, innerHeight - R - 12); post.movedAt = now;
       } else {
-        tg.x = home.x; tg.y = home.y; tg.k = now > waryUntil ? 14 : 30; tg.vmax = 260;
-        if (now < waryUntil && pd < 130) { tg.x = p.x - dp.x / pd * 90; tg.y = p.y - dp.y / pd * 90; tg.scared = 0.4; }
+        tg.x = post.x; tg.y = post.y; tg.k = wary ? 30 : 22; tg.vmax = 240;
+        if (wary && pd < 130) { tg.x = p.x - dp.x / pd * 90; tg.y = p.y - dp.y / pd * 90; tg.scared = 0.4; }
       }
+      // it travels in bouts, as rabbits do: a few hops, stop, look, a few more
+      if (!PUP && !wary && Math.hypot(tg.x - p.x, tg.y - p.y) > 12) {
+        if (now > gait.until) { gait.go = !gait.go; gait.until = now + (gait.go ? rnd(0.4, 0.85) : rnd(0.25, 0.8)); }
+        if (!gait.go) { tg.x = p.x; tg.y = p.y; tg.k = 70; }
+      } else { gait.go = true; gait.until = 0; }
+      if (!tg.happy) tg.happy = clamp(inner.valence * 0.55, 0, 0.3);   // it shows in its face
+      if (inner.valence < -0.2) tg.lid = Math.min(tg.lid, 0.88);
       if (!fidget && now > nextFidgetAt && pd > 90) {
-        const r = Math.random();
-        if (personality && Math.random() < 0.6 && idleAct(dp, pd)) { /* one of its own habits */ }
-        else if (night && r < 0.3) { fidget = { name: 'yawn', since: now, until: now + 1.3 }; say('yawn'); }
-        else if (r < 0.4) { wander = { x: rnd(0, innerWidth), y: rnd(0, innerHeight) }; wanderUntil = now + rnd(0.8, 2); }
-        else if (r < 0.58) { fidget = { name: 'stretch', since: now, until: now + 1.5 }; say('stretch', { chance: 0.5 }); }
-        else if (r < 0.72) { fidget = { name: 'yawn', since: now, until: now + 1.3 }; say('yawn', { chance: 0.7 }); }
-        else if (r < 0.84) jump(140);
-        else if (r < 0.92) fidget = { name: 'shiver', since: now, until: now + 0.5 };
-        else say('babble');            // just thinking out loud
-        nextFidgetAt = now + rnd(4, 9);
+        const took = chooseHabit(now, dp, pd);
+        const pace = (isReading(now) ? 1.5 : 1) * (twilight ? 0.8 : 1) * (1.3 - 0.6 * inner.arousal);
+        nextFidgetAt = now + took + rnd(4, 10) * pace;
+      }
+      // a quiet thought about what you have settled on reading
+      if (focus && !focus.said && now - focus.since > 5 && now - ptr.moved > 1.5) {
+        focus.said = true;
+        const line = topicLine(focus.text);
+        if (line) say('read', { chance: 0.6, text: line });
       }
       if ((PUP || CAT) && dp && pd > 120 && pd < 380 && pspeed > 30 && pspeed < 420 && now > nextPounceAt && mode === 'home') {
         startAct(PUP ? 'playbow' : 'stalk', PUP ? 1.0 : 1.2); nextPounceAt = now + rnd(14, 28);
@@ -811,16 +1034,32 @@ export function createCreature({
       } else if (CAT && dp && pointerIdle > 1.2 && pd < 220 && now > nextSlowBlinkAt) {
         startAct('slowblink', 1.5); nextSlowBlinkAt = now + rnd(12, 22);
       }
-      if (dp && pointerIdle > 3 && pd > 110 && !inspect && now > waryUntil && now > nextInspectAt && mode === 'home') {
+      // a resting pointer is usually a person reading, so it only comes to poke
+      // at one when you haven't been scrolling either, and not very often
+      if (dp && pointerIdle > 5 && pd > 110 && !inspect && now > waryUntil && now > nextInspectAt && now - reader.lastScroll > 25 && mode === 'home') {
         inspect = { x: ptr.x, y: ptr.y, since: now, until: now + 7, poked: 0 };
-        nextInspectAt = now + rnd(25, 45);
+        nextInspectAt = now + rnd(45, 90);
       }
-      if (mischief && dp && !block && now > nextBlockAt && pspeed > 140 && pspeed < 650 && mode === 'home') {
+      // it only plays tricks on people it is getting on with
+      if (mischief && dp && !block && trust > 0.25 && inner.valence > -0.2 && now > nextBlockAt && pspeed > 140 && pspeed < 650 && mode === 'home') {
         const el = linkAhead();
         if (el) { block = { el, until: now + 4.5, shooed: false }; nextBlockAt = now + (CAT ? rnd(15, 35) : rnd(45, 90)); }
       }
-      if (now - lastActivity > sleepAfter * 0.5) { tg.sy = 0.95; tg.lid = 0.6; }
-      if (now - lastActivity > sleepAfter && !asleep) { asleep = true; nextZ = now + 0.8; }
+      // nodding off: the eyes get heavy and the head sinks, slowly, until it
+      // jerks itself awake, and each time it goes a little further. A tired or
+      // full creature gets there sooner.
+      const tiredAfter = sleepAfter * (0.55 + 0.9 * inner.energy) * (belly.v > 0.6 ? 0.8 : 1);
+      const idleFor = now - lastActivity;
+      drowsy = mode === 'home' ? clamp((idleFor - tiredAfter * 0.55) / (tiredAfter * 0.45), 0, 1) : 0;
+      if (drowsy > 0) {
+        const saw = (now * 0.3) % 1;
+        droop = saw * saw * saw;
+        tg.lid = Math.min(tg.lid, 1 - 0.5 * drowsy - 0.42 * drowsy * droop);
+        tg.sy -= (0.03 + 0.05 * droop) * drowsy;
+        tg.arms = [[1.2, 0.4], [PI - 1.2, 0.4]];
+        if (drowsy > 0.35 && Math.floor(now * 0.3) !== Math.floor((now - dt) * 0.3)) { S.sy.vel += 3 * drowsy; S.lid.vel += 14; ear.vel += 4; }
+      }
+      if (idleFor > tiredAfter && mode === 'home') fallAsleep();
     }
     if (inspect && (now >= inspect.until || (dp && pointerIdle < 0.2 && pd < 50))) inspect = null;
     if (inspect && pointerIdle < 0.3 && mode === 'inspect') inspect.until = Math.min(inspect.until, now + 1.2);
@@ -833,14 +1072,22 @@ export function createCreature({
 
     if (act) {
       if (now >= act.until) { const next = act.next; act = null; if (next) next(); }
-      else if (mode !== act.name) act = null;
+      // something more pressing took over; a habit chosen this very frame hasn't had its turn yet
+      else if (mode !== act.name && now - act.since > 0.05) act = null;
     }
     if (glance && now < glance.until && (mode === 'home' || mode === 'loaf') && glance.el.isConnected) {
       const r = glance.el.getBoundingClientRect();
       look = { x: r.left - p.x, y: r.top + r.height / 2 - p.y };
     }
-    if (now < wanderUntil && (mode === 'home' || mode === 'follow')) look = { x: wander.x - p.x, y: wander.y - p.y };
+    const attending = mode === 'home' || mode === 'follow';
+    if (attending && (dp || !exit || now - exit.t >= 4)) look = chooseGaze(now, dp, pd, pspeed);
+    else gz.kind = null;
     if (now < afterAttend && mode === 'home' && dp) look = dp;
+    if (drowsy > 0.2) look = { x: 0, y: 0.3 + 0.55 * droop, abs: true };
+    // you are flying down the page: it looks the way things are going, eyes wide
+    if (mode === 'home' && now - reader.lastScroll < 0.35 && reader.speed > 1200) { look = { x: 0.1, y: reader.dir * 0.7, abs: true }; tg.lid = Math.max(tg.lid, 1.08); }
+    // reading quietly along with you
+    if (mode === 'home' && gz.kind === 'focus' && !drowsy) { tg.lid = Math.min(tg.lid, 0.84); if (tg.tilt === 0) tg.tilt = 0.05; }
     if (look) {
       if (look.abs) tg.look = [look.x, look.y];
       else { const d = Math.hypot(look.x, look.y) || 1; tg.look = [look.x / d, look.y / d * 0.8]; }
@@ -852,7 +1099,7 @@ export function createCreature({
 
     // saccades: every so often the eyes jump to a slightly different spot and hold
     if (now > nextSaccadeAt) {
-      const amp = mode === 'attend' || mode === 'read' ? 0.07 : mode === 'sleep' || mode === 'dizzy' ? 0 : 0.24;
+      const amp = mode === 'attend' || mode === 'read' || gz.kind === 'focus' ? 0.07 : mode === 'sleep' || mode === 'dizzy' ? 0 : 0.24;
       sac[0].t = rnd(-amp, amp); sac[1].t = rnd(-amp, amp) * 0.6;
       nextSaccadeAt = now + (Math.random() < 0.25 ? rnd(0.12, 0.3) : rnd(0.5, 2.6));
     }
@@ -873,9 +1120,10 @@ export function createCreature({
       // ears: up when alert, flopped when relaxed, pinned flat when afraid
       // (flattened ears and a crouch read as fear: RSPCA; Rabbit Grimace Scale)
       const afraid = ['flee', 'carry', 'trance', 'thrown'].includes(mode);
-      const alert = ['attend', 'read', 'fetch', 'hoard', 'inspect', 'freeze', 'periscope'].includes(mode) || pd < 150;
+      const alert = ['attend', 'read', 'fetch', 'hoard', 'inspect', 'freeze', 'periscope', 'sniff', 'beg'].includes(mode) || pd < 150;
       const easy = ['flop', 'sleep', 'pet', 'loaf'].includes(mode) || (mode === 'eat' && tg.happy > 0.9);
-      ear.t = afraid ? 0.38 : alert ? 1.3 : easy ? 0.55 : 1;
+      // and otherwise they say how it is feeling: lower when low, higher when keyed up
+      ear.t = afraid ? 0.38 : alert ? 1.3 : easy ? 0.55 : clamp(0.84 + 0.3 * inner.arousal + 0.12 * inner.valence, 0.6, 1.2);
       // the nose sniffs faster the more aroused it is, and stops when it is
       // deeply relaxed; sniffing is breath-locked (Kurnikova et al. 2017, in rats)
       const arousal = afraid || alert ? 1 : easy ? 0 : mode === 'freeze' ? 0 : 0.4;
@@ -887,6 +1135,96 @@ export function createCreature({
     tg.sy -= Math.abs(wind) * 0.25; tg.sx += Math.abs(wind) * 0.15;
     tg.mode = mode;
     return tg;
+  }
+
+  // Going somewhere new. It stays where it is until there is a reason to move,
+  // and a small difference isn't one: otherwise it rides the margin like a lift.
+  function movePost(y) {
+    post.y = clamp(y, R + 12, innerHeight - R - 12);
+    post.x = MARGIN + rnd(-Math.min(10, MARGIN * 0.2), Math.min(10, MARGIN * 0.2));
+    post.movedAt = nowS();
+  }
+  function updatePost(now) {
+    if (Math.abs(post.x - MARGIN) > 14) post.x = MARGIN;     // the margin itself moved
+    if (post.y > innerHeight - R - 12) post.y = innerHeight - R - 12;
+    let want = null;
+    // where the pointer has come to rest takes precedence while you are moving it
+    if (ptr.x != null && band.y != null && now - band.since > 1.6 && now - ptr.moved < 1.5) want = band.y;
+    else if (focus?.el.isConnected) {
+      const r = focus.el.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < innerHeight) want = Math.max(r.top + Math.min(r.height, 60) / 2, innerHeight * 0.3);
+    }
+    if (want != null && Math.abs(want - post.y) > 120 && now - post.movedAt > 2.5) movePost(want + rnd(-14, 14));
+  }
+
+  // What it looks at when nothing has told it where to look. Attention is a
+  // thing it gives out for a while and then moves on from: the pointer draws the
+  // eye when it is close or moving, but doesn't hold it forever. The rest of the
+  // time it looks at what you are reading, at something on the page, at you, or
+  // at nothing. A big shift of gaze usually comes with a blink, as ours does.
+  const inViewThings = () => {
+    const found = [];
+    for (const el of [...links(), ...document.querySelectorAll('h1, h2, h3, img, figure')]) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 4 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth) found.push(el);
+    }
+    return found;
+  };
+  function chooseGaze(now, dp, pd, pspeed) {
+    // the eyes get to the link before your pointer does
+    if (dp && pspeed > 140 && pspeed < 1400) {
+      if (now > aheadAt) { aheadAt = now + 0.15; aheadEl = linkAhead(); }
+    } else if (now > aheadAt) aheadEl = null;
+    if (aheadEl?.isConnected) {
+      const r = aheadEl.getBoundingClientRect();
+      gz = { kind: 'ahead', until: now + 0.4 };
+      return { x: r.left + r.width / 2 - p.x, y: r.top + r.height / 2 - p.y };
+    }
+    const moving = !!dp && pspeed > 60 && now - ptr.moved < 0.4;
+    const forced = dp && (pd < 170 || pspeed > 700 || now < waryUntil);   // can't not look
+    if (forced) { if (gz.kind !== 'pointer') gz = { kind: 'pointer', until: now + rnd(0.6, 1.4) }; return dp; }
+    if (now >= gz.until) {
+      const reading = isReading(now);
+      const options = [
+        ['pointer', moving ? 3 : dp ? 0.25 : 0, 1, 2.6],
+        ['you', 0.45 + 0.7 * trust, 0.8, 2],
+        ['focus', reading ? 2.4 : focus ? 0.4 : 0, 2.5, 6],
+        ['thing', 0.5 + inner.boredom + inner.novelty, 1, 2.8],
+        ['away', 0.5, 0.6, 1.5],
+      ];
+      let r = Math.random() * options.reduce((sum, o) => sum + o[1], 0);
+      const [kind, , lo, hi] = options.find(o => (r -= o[1]) <= 0) || options[4];
+      const next = { kind, until: now + rnd(lo, hi) };
+      if (kind === 'thing') { const all = inViewThings(); if (all.length) next.el = pick(all); else next.kind = 'away'; }
+      if (next.kind === 'away') { next.x = rnd(-0.7, 0.7); next.y = rnd(-0.5, 0.7); }
+      if (next.kind !== gz.kind && Math.random() < 0.6) nextBlinkAt = Math.min(nextBlinkAt, now);
+      gz = next;
+    }
+    switch (gz.kind) {
+      case 'pointer': if (dp) return dp; break;
+      case 'you': return { x: 0, y: -0.05, abs: true };
+      case 'focus': return { x: -0.1 + 0.9 * ((now * 0.45) % 1), y: 0.25, abs: true };   // along the line and back
+      case 'thing':
+        if (gz.el?.isConnected) { const r = gz.el.getBoundingClientRect(); return { x: r.left + r.width / 2 - p.x, y: r.top + r.height / 2 - p.y }; }
+        break;
+      case 'away': return { x: gz.x, y: gz.y, abs: true };
+    }
+    gz.until = 0;
+    return { x: 0, y: -0.05, abs: true };
+  }
+
+  // the slow variables, a little each frame
+  function live(now, dt, mode) {
+    const I = inner, calm = CALM_MODES.has(mode);
+    if (asleep) I.energy = Math.min(1, I.energy + 0.018 * dt);
+    else I.energy = Math.max(0, I.energy - dt * (night ? 0.003 : 0.0018) * (calm ? 1 : 1.6));
+    I.arousal += ((calm ? 0.2 : 0.45) - I.arousal) * (1 - Math.exp(-dt * 0.25));
+    I.valence += (0.05 + 0.3 * (trust - 0.35) - I.valence) * (1 - Math.exp(-dt * 0.03));
+    I.novelty *= Math.exp(-dt * 0.08);
+    I.boredom = calm ? Math.min(1, I.boredom + 0.014 * dt) : Math.max(0, I.boredom - 0.1 * dt);
+    rouse = Math.max(0, rouse - 0.22 * dt);
+    if (mode === 'pet') { trust = Math.min(1, trust + 0.006 * dt); feel(0.1 * dt); lastThing = 'pet'; }
+    if (now > saveAt) { saveAt = now + 15; remember(); }
   }
 
   function merge(tg, g) {
@@ -906,6 +1244,7 @@ export function createCreature({
   function gulp() {
     crumbs = crumbs.filter(c => c !== eating.crumb);
     full += PER_RADISH;
+    lastMeal = nowS(); mem.fed++; lastThing = 'fed';
     S.sy.vel -= 2.4; jelly(4, 2);
     later.push({ at: nowS() + 0.18, fn: () => { belly.vel += 3.5; for (let i = 7; i < 14; i++) wobV[i] += 2.2; } });
     if (full > FULL) {                                // that one tipped it over
@@ -1148,7 +1487,7 @@ export function createCreature({
     S.happy.t = tg.happy; S.scared.t = tg.scared; S.mouth.t = tg.mouth;
     S.look[0].t = tg.look[0]; S.look[1].t = tg.look[1];
     tg.arms.forEach((a, i) => { S.arms[i][0].t = a[0]; S.arms[i][1].t = a[1]; });
-    if (now > nextBlinkAt && !asleep) { S.lid.t = 0.05; nextBlinkAt = now + (Math.random() < 0.2 ? 0.35 : rnd(2, 6)); setTimeout(() => { S.lid.t = tg.lid; }, 90); }
+    if (now > nextBlinkAt && !asleep) { S.lid.t = 0.05; nextBlinkAt = now + (Math.random() < 0.2 ? 0.35 : rnd(2, 6) * (1.25 - 0.5 * inner.arousal)); setTimeout(() => { S.lid.t = tg.lid; }, 90); }
     else if (S.lid.t !== 0.05 || now > nextBlinkAt - 0.1) S.lid.t = tg.lid;
     // talking: the mouth opens on each vowel as it is typed out
     if (bubble && bubble.kind === 'say') {
@@ -1161,7 +1500,7 @@ export function createCreature({
   // it like a tail, a bunny's is an ear that perks up and flops down
   function sproutPose() {
     let lean = S.tilt.v + flipAngle(nowS()) + face.v * 0.18, len = R * 0.85;
-    if (asleep) { lean += 1.15; len = R * 0.7; }
+    if (asleep) { lean += BUN ? 0.5 : 1.15; len = R * 0.7; }
     if (BUN) { len = R * 0.85 * clamp(ear.v, 0.38, 1.4); lean += (1 - clamp(ear.v, 0.35, 1)) * 1.6 * (face.v >= 0 ? 1 : -1); }
     if (PUP) lean += wag.v * 0.6 * Math.sin(t * 17);
     return { lean, len };
@@ -1620,6 +1959,10 @@ export function createCreature({
     if (!arrived) { arrived = true; S.sc.v = 0.05; jelly(4); }
     const tg = think(now, dt);
     if (tg.mode !== prevMode) {
+      const felt = FEELS[tg.mode];
+      if (felt) { feel(felt[0], felt[1]); trust = clamp(trust + felt[2], 0, 1); }
+      if (RUFFLING.has(tg.mode)) inner.ruffled = now;
+      if (tg.mode === 'thrown' || tg.mode === 'fight') lastThing = tg.mode;
       const line = ON_ENTER[tg.mode];
       if (line && !(BUN && tg.mode === 'flee')) say(line[0], { chance: line[1], force: line[2] });   // a bunny's fright is a thump, not a word
       else if (prevMode === 'thrown' || ((prevMode === 'carry' || prevMode === 'trance') && tg.mode !== 'thrown' && tg.mode !== 'trance' && tg.mode !== 'flee')) say('land', { chance: 0.7, force: true });
@@ -1628,6 +1971,7 @@ export function createCreature({
       prevMode = tg.mode;
     }
     setTargets(tg, now);
+    live(now, dt, tg.mode);
     while (dt > 0) { const h = Math.min(dt, 1 / 120); t += h; physics(tg, h); dt -= h; }
     ptr.over = ptr.x != null && Math.hypot(ptr.x - p.x, ptr.y - p.y + hop) < R * S.sc.v * 1.5 + 6;
     canvas.dataset.over = ptr.over && !carried ? '1' : '';
@@ -1652,6 +1996,7 @@ export function createCreature({
     ptr.x = e.clientX; ptr.y = e.clientY; ptr.moved = now;
     if (!wasOver) ptr.overSince = now;
     exit = null;
+    if (band.y == null || Math.abs(e.clientY - band.y) > 70) { band.y = e.clientY; band.since = now; }
 
     // circling near it: two full loops of the pointer inside a few seconds and it
     // gets dizzy. Measured from the pointer's own heading, not the angle around
@@ -1676,16 +2021,17 @@ export function createCreature({
       wiggle.flips = wiggle.flips.filter(t0 => now - t0 < 0.9);
       if (wiggle.flips.length >= 5 && now > giggleUntil) { giggleUntil = now + 1.5; wiggle.flips = []; jump(70); }
     }
-    touch();
+    // close by it wakes it quickly; across the room, it takes a lot of moving about
+    stir(cd < 110 ? 0.08 : Math.hypot(mx, my) * 0.0007);
     if (carried) e.preventDefault();
   }, { passive: false });
   on(document.documentElement, 'mouseleave', () => {
     if (ptr.x != null) exit = { x: ptr.x, y: ptr.y, t: nowS() };
-    if (BUN && !act && !carried) startAct('periscope', 1.6);   // where did it go?
+    if (BUN && !act && !carried && !asleep) startAct('periscope', 1.6);   // where did it go?
     ptr.x = null; ptr.vx = ptr.vy = 0; ptr.over = false;   // or the next frame thinks it is still being petted
   });
   on(window, 'pointerdown', e => {
-    touch();
+    if (ptr.over) touch(); else stir(0.45);
     if (!ptr.over || e.button !== 0 || flip) return;
     e.preventDefault(); swallowClick = true;
     if (block) { shoo(); return; }
@@ -1735,6 +2081,7 @@ export function createCreature({
     jump(240); S.happy.v = 1; say('flip', { force: true });
   });
 
+  on(window, 'pagehide', remember);
   readColours();
   if (reducedMotion) { arrived = true; draw(); }
   else raf = requestAnimationFrame(frame);
@@ -1745,6 +2092,8 @@ export function createCreature({
     hoarding = null; eating = null; refuse = null; act = null; crumbs = []; bits = []; germs = []; fight = null;
     afterAttend = 0; exit = null;
     courier = null; catching = null; packing = null; parcel = false; parcels = [];
+    post = null; focus = null; mused.clear(); aheadEl = null; gz = { kind: null, until: 0 };
+    inner.novelty = 1; nextFidgetAt = Math.min(nextFidgetAt, nowS() + 3);   // a new place: it has a look round
   }
 
   const api = {
@@ -1754,20 +2103,33 @@ export function createCreature({
         glance = { el, until: nowS() + 1.6 }; say('meh', { chance: 0.35 });
         return;
       }
+      if (asleep) { stir(0.35); return; }                    // an ear goes up; it takes more than that
       act = null;
       attended = { el, gesture: gesture || 'point', since: nowS() };
-      touch(); inspect = null; wanderUntil = 0;
-      const g = gesture || 'point';
-      say(g === 'point' ? 'look' : g, { chance: g === 'point' ? 0.35 : 0.85 });
+      touch(); inspect = null;
       setTimeout(() => { if (attended?.el === el) jelly(2); }, 160);   // the stroke lands
     },
     release(el) {
       if (!el || attended?.el === el) { attended = null; afterAttend = nowS() + 1.1; }
     },
-    beat() { if (reducedMotion) return; jump(120); jelly(1.5); S.arms[0][1].vel += 6; touch(); },
+    beat() { if (reducedMotion) return; if (asleep) { stir(0.08); return; } jump(120); jelly(1.5); S.arms[0][1].vel += 6; touch(); },
     nod() { if (reducedMotion || asleep) return; v.y += 60; S.sy.vel -= 1.5; },
-    shift() { if (reducedMotion) return; touch(); jump(180); S.tilt.vel += 8; },
+    shift() { if (reducedMotion) return; if (asleep) { stir(0.1); return; } touch(); jump(180); S.tilt.vel += 8; },
     wave(seconds = 1.5) { api.do('wave', seconds); say('hello', { force: true }); },
+    // hello, depending on whether it has met you, and how long it has been
+    greet() {
+      if (reducedMotion) return;
+      const back = awaySeconds <= SAME_VISIT, first = visitNo <= 1;
+      const key = back ? 'hello' : first ? 'shy' : night ? 'late' : awaySeconds > 7 * 86400 ? 'longtime' : 'again';
+      api.do('wave', first && !back ? 1 : 1.5);
+      say(key, { force: true });
+      if (key === 'longtime' || (key === 'again' && trust > 0.6)) later.push({ at: nowS() + 1.6, fn: () => { if (BUN) binky(); else jump(180); feel(0.3, 0.3); } });
+    },
+    // you got to the end of the page: a small bow, and it's pleased
+    finished() {
+      if (reducedMotion || asleep) return;
+      say('finished', { force: true }); api.do('bow', 1.2); S.happy.v = 1; feel(0.2, 0.3);
+    },
     do(name, seconds = 1.5) { if (reducedMotion || !G[name]) return; touch(); fidget = { name, since: nowS(), until: nowS() + seconds }; },
     cheer() { if (reducedMotion) return; say('cheer', { force: true }); jump(200); S.happy.v = 1; S.arms[0][0].vel -= 25; S.arms[1][0].vel += 25; },
     // one of its words (hello, cheer, look, babble...) or any text you like
@@ -1776,14 +2138,27 @@ export function createCreature({
       if (WORDS[what] || what === 'babble') say(what, { force: true, ...opts });
       else say('look', { force: true, ...opts, text: String(what) });
     },
-    feed(pageX, pageY) { if (crumbs.length < 5) crumbs.push({ x: pageX, y: pageY, born: nowS(), rot: rnd(-0.35, 0.35) }); },
+    feed(pageX, pageY) { touch(); if (crumbs.length < 5) crumbs.push({ x: pageX, y: pageY, born: nowS(), rot: rnd(-0.35, 0.35) }); },
     scroll(dy) {
       if (reducedMotion) return;
-      touch();
+      const now = nowS(), gap = now - reader.lastScroll, dir = Math.sign(dy);
+      reader.speed = gap < 0.4 ? reader.speed + (Math.abs(dy) / Math.max(gap, 0.008) - reader.speed) * 0.25 : 0;
+      reader.lastScroll = now;
+      stir(Math.abs(dy) * 0.0012);
       wind = clamp(wind + dy * 0.004, -0.6, 0.6);
       p.y = clamp(p.y - dy * 0.12, R, innerHeight - R);
+      if (asleep) return;
       jelly(Math.min(2, Math.abs(dy) * 0.03), 3);
+      if (reader.speed > 1500) feel(0, 0.01);
+      // scrolling back up over what you just read: it notices
+      if (dir && dir !== reader.dir) { reader.armed = dir < 0 && reader.dir > 0 && reader.run > 400; reader.run = 0; reader.dir = dir; }
+      reader.run += Math.abs(dy);
+      if (reader.armed && reader.run > 140 && now > reader.nextTilt && !attended && !act) {
+        reader.armed = false; reader.nextTilt = now + 45;
+        startAct('headtilt', 1.3, { dir: 1 }); say('reread', { chance: 0.6 });
+      }
     },
+    dwell(el, text = '') { focus = el ? { el, text: String(text).slice(0, 500), since: nowS(), said: false } : null; },
     // read along: rect() returns where the text is (or null when there is none)
     read(rect, text = '') {
       if (reducedMotion) return;
@@ -1795,7 +2170,7 @@ export function createCreature({
         if (text !== reading.text) { reading.text = text; reading.changedAt = nowS(); reading.reacted = false; }
       }
     },
-    sleep() { if (!asleep) { asleep = true; nextZ = nowS() + 0.5; } },
+    sleep() { fallAsleep(); },
     wake() { touch(); },
     get hovered() { return ptr.over; },
     get active() { return active; },
@@ -1862,7 +2237,7 @@ export function createCreature({
         canvas.style.display = 'none';
       } else {
         canvas.style.display = '';
-        p.x = MARGIN; p.y = innerHeight * 0.4; v.x = v.y = 0;
+        p.x = MARGIN; p.y = innerHeight * 0.4; v.x = v.y = 0; post = null;
         tip.x = p.x; tip.y = p.y - R * 1.8; tip.vx = tip.vy = 0;
         readColours(); last = 0;
         if (reducedMotion) draw(); else raf = requestAnimationFrame(frame);
@@ -1871,8 +2246,14 @@ export function createCreature({
     // a new page is up: clear what belonged to the old one and walk to the new margin
     newPage() { forgetPage(); readColours(); },
     get fullness() { return full; },
+    get mood() {
+      const r = v => +v.toFixed(2);
+      return { mode: prevMode, gaze: gz.kind, asleep, rouse: r(rouse), trust: r(trust), visit: visitNo, full: r(full),
+        energy: r(inner.energy), valence: r(inner.valence), arousal: r(inner.arousal), boredom: r(inner.boredom), novelty: r(inner.novelty) };
+    },
     destroy() {
       cancelAnimationFrame(raf);
+      remember();
       for (const off of offs) off();
       document.body.style.cursor = ''; document.body.style.userSelect = '';
       if (own) canvas.remove(); else ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1889,6 +2270,7 @@ export function bindPage(pet, root = document, {
   readingLine = 0.42,       // fraction of the viewport height where a line is "being read"
   crumbs = true,            // clicking blank space drops a crumb
   blankExclude = 'a, p, h1, h2, h3, li, button, input, textarea, select, label, footer, nav, [data-no-crumb]',
+  readSelector = 'p, li, blockquote, pre, h1, h2, h3, h4, figure',   // what counts as a block you might be reading
   greetOnLoad = true,
   tidy = true,              // now and then something slips crooked and the creature puts it straight
   germs = true,             // now and then a carrot virus turns up and gets chased off in a fight
@@ -1917,7 +2299,17 @@ export function bindPage(pet, root = document, {
   });
 
   // scrolling: beats as stressed words pass the reading line, a shift at a heading, a nod when you pause
-  let prevY = scrollY, scrolled = 0, stopTimer = 0, scrollRaf = 0;
+  let prevY = scrollY, scrolled = 0, stopTimer = 0, scrollRaf = 0, pageRead = 0, finished = false;
+  // the block sitting on the reading line, innermost if they nest
+  const readingBlock = () => {
+    const y = innerHeight * readingLine;
+    let found = null;
+    for (const el of root.querySelectorAll(readSelector)) {
+      const r = el.getBoundingClientRect();
+      if (r.height && r.top <= y && r.bottom >= y) found = el;
+    }
+    return found;
+  };
   const crossed = (el, dy, line) => { const r = el.getBoundingClientRect(); if (!r.height) return false; const cur = r.top + r.height / 2 - line, prev = cur + dy; return prev * cur <= 0 && prev !== cur; };
   on(window, 'scroll', () => {
     if (scrollRaf) return;
@@ -1928,11 +2320,21 @@ export function bindPage(pet, root = document, {
       pet.scroll(dy);
       scrolled += Math.abs(dy);
       readDist += Math.abs(dy);
+      pageRead += Math.abs(dy);
+      // the end of a long page, having actually read down it
+      const docH = document.documentElement.scrollHeight;
+      if (scrollY < innerHeight) { finished = false; if (scrollY < 40) pageRead = 0; }
+      if (!finished && docH > innerHeight * 2.5 && pageRead > innerHeight * 1.5 && scrollY + innerHeight >= docH - 4) { finished = true; pet.finished(); }
       const line = innerHeight * readingLine - Math.sign(dy) * 14;   // the stroke lands just before the word
       for (const el of root.querySelectorAll(beatSelector)) if (crossed(el, dy, line)) { pet.beat(); break; }
       for (const el of root.querySelectorAll(topicSelector)) if (crossed(el, dy, innerHeight * readingLine)) { pet.shift(); break; }
       clearTimeout(stopTimer);
-      stopTimer = setTimeout(() => { if (scrolled > 90) pet.nod(); scrolled = 0; }, 380);
+      stopTimer = setTimeout(() => {
+        if (scrolled > 90) pet.nod();
+        scrolled = 0;
+        const el = readingBlock();
+        pet.dwell(el, el?.textContent);                              // you have settled on this bit
+      }, 380);
     });
   }, { passive: true });
 
@@ -2041,7 +2443,7 @@ export function bindPage(pet, root = document, {
   }, 500) : 0;
 
   let hello = 0;
-  if (greetOnLoad) hello = setTimeout(() => pet.wave(1.5), 700);
+  if (greetOnLoad) hello = setTimeout(() => pet.greet(), 700);
 
   return () => {
     for (const off of offs) off();

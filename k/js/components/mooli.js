@@ -49,6 +49,7 @@ export function ensureMooli() {
         links: () => root.querySelectorAll('a[href]'),
         font: fontFor(),
         personality: personality(),
+        memory: 'mooli',   // kept in this browser only; nothing is sent anywhere
     });
     // keyboard focus attends like hover does, on every page
     root.addEventListener('focusin', e => { const a = e.target.closest?.('a[href]'); if (a && shown) pet.attend(a, a.dataset.gesture); });
