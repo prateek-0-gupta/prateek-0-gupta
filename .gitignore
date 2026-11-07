@@ -1,2 +1,7 @@
 /k/js/pages/projects/baoli
 /k/js/pages/projects/posters
+.env
+# generated sprite originals kept locally for re-keying (tools/gen_snake_assets.mjs --rekey)
+/k/js/pages/projects/snake/snake_assets/*.raw.png
+/k/js/pages/projects/snake/snake_assets/v2/*.raw.png
+/k/js/pages/projects/snake/snake_assets/ui/*.raw.png
